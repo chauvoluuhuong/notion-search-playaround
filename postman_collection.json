@@ -1,0 +1,1942 @@
+{
+  "info": {
+    "name": "Notion Search — Engineering Issue Tracker",
+    "_postman_id": "6f3a1c40-7c8e-4a1e-9f21-notionsearch01",
+    "description": "Search + filter API over the Notion database **🛠️ Engineering Issue Tracker**.\n\n### Setup\n1. Start the server: `npm start` (defaults to `http://localhost:3100`).\n2. Adjust the `baseUrl` collection variable if you run on another host/port.\n3. **Run `01 · Health & metadata → Filter instructions` first.** Its test script captures `{{assigneeId}}`, `{{assigneeName}}`, `{{assigneeEmail}}`, `{{sprintId}}` and `{{sprintName}}`, which the *by id* and *by email* requests depend on.\n\nThe whole collection is safe to run with Postman's Collection Runner — every request is a read, nothing writes to Notion.\n\n### Things worth knowing\n- Values inside one parameter are **OR**-ed; different parameters are **AND**-ed.\n- Notion cannot text-match `people` or `relation` columns, so assignee and sprint names are resolved to ids before filtering.\n- Notion cannot see page **body** text at all. That text is indexed by this server and matched in-process — see the two paired requests in *02 · Text search*.\n- Unresolvable filter values return HTTP 200 with a `notice`, never a 4xx.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 · Health & metadata",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Liveness probe. Returns `{ ok: true }`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('ok', () => pm.expect(pm.response.json().ok).to.eql(true));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Options — values for the form dropdowns",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/options",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "options"
+              ]
+            },
+            "description": "Compact value lists: assignees, sprints, statuses, priorities. Backs the four dropdowns in the web form."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('all four lists present', () => {",
+                  "  ['assignees','sprints','statuses','priorities'].forEach(k => pm.expect(d).to.have.property(k));",
+                  "});",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Options — force a cache refresh",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/options?refresh=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "options"
+              ],
+              "query": [
+                {
+                  "key": "refresh",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Assignee/sprint values are cached for 5 minutes. `refresh=1` rebuilds the directory immediately — use after adding a sprint or a teammate."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter instructions — RUN THIS FIRST",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/filters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "filters"
+              ]
+            },
+            "description": "**The filter capability API.** Self-describing: for every filterable field it returns the Notion property, the operators, the raw Notion filter template and the complete set of allowed values for **assignee** and **sprint**.\n\nIts test script stores `{{assigneeId}}`, `{{assigneeName}}`, `{{assigneeEmail}}`, `{{sprintId}}` and `{{sprintName}}` as collection variables, so run it once before the *by id* / *by email* requests further down."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture real ids so the \"by id\" requests below work.",
+                  "const d = pm.response.json();",
+                  "const a = d.filters.find(f => f.field === 'assignee');",
+                  "const s = d.filters.find(f => f.field === 'sprint');",
+                  "const namedUser = a.values.find(v => v.filterable_by_name) || a.values[0];",
+                  "const usedSprint = s.values.find(v => v.task_count > 0) || s.values[0];",
+                  "pm.collectionVariables.set('assigneeId',    namedUser.id);",
+                  "pm.collectionVariables.set('assigneeName',  namedUser.name  || namedUser.label);",
+                  "pm.collectionVariables.set('assigneeEmail', namedUser.email || '');",
+                  "pm.collectionVariables.set('sprintId',      usedSprint.id);",
+                  "pm.collectionVariables.set('sprintName',    usedSprint.name || usedSprint.label);",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('assignee + sprint values present', () => {",
+                  "  pm.expect(a.values.length).to.be.above(0);",
+                  "  pm.expect(s.values.length).to.be.above(0);",
+                  "});",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter instructions — force a cache refresh",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/filters?refresh=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "filters"
+              ],
+              "query": [
+                {
+                  "key": "refresh",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Same document, rebuilt from Notion rather than served from the 5-minute cache."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 · Text search (q)",
+      "item": [
+        {
+          "name": "All tasks — no filter at all",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?page_size=25",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "page_size",
+                  "value": "25"
+                }
+              ]
+            },
+            "description": "No parameters means no filter: every row, newest edit first. `total` is the real count, not the page size."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('returns rows', () => pm.expect(pm.response.json().total).to.be.above(0));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Free text across all default fields",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=supplier&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "supplier"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Case-insensitive `contains` over Assignee, Description, Summary, Sprint, Task Name, Dependencies, Story ID **and the page body**.\n\nCheck `matched_fields` on each row to see which field actually hit."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Text that lives ONLY in the page body",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=not-found%20response",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "not-found response"
+                }
+              ]
+            },
+            "description": "`\"not-found response\"` appears in no property — only inside the body of task #4.\n\nA Notion database query can never see page body text, so this server indexes the block tree of every page and matches it in-process. The row comes back with `matched_fields: [\"page_content\"]` and a highlighted excerpt."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('finds the page-body match', () => pm.expect(d.total).to.eql(1));",
+                  "pm.test('matched via page_content', () =>",
+                  "  pm.expect(d.results[0].matched_fields).to.include('page_content'));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same term with page_content OFF — proves Notion alone cannot find it",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=not-found%20response&fields=summary,description,assignee,sprint,task_name,story_id,dependencies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "not-found response"
+                },
+                {
+                  "key": "fields",
+                  "value": "summary,description,assignee,sprint,task_name,story_id,dependencies"
+                }
+              ]
+            },
+            "description": "Identical search minus the `page_content` field, i.e. pure Notion-side behaviour. Returns **0 results** — this is exactly why a property-only search was missing rows."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('property-only search finds nothing', () =>",
+                  "  pm.expect(pm.response.json().total).to.eql(0));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Restrict text to Summary + Description",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=order&fields=summary,description&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "order"
+                },
+                {
+                  "key": "fields",
+                  "value": "summary,description"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "`fields` narrows what `q` searches. Allowed keys: assignee, description, summary, sprint, task_name, dependencies, story_id, source_team, source_type, page_content."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search the assignee column by name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q={{assigneeName}}&fields=assignee&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{assigneeName}}"
+                },
+                {
+                  "key": "fields",
+                  "value": "assignee"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Notion cannot text-match a `people` column. The term is resolved against the user directory first, then filtered by user id. `text_matching.notion_filter_equivalent` shows the id-based filter that was actually evaluated."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search the sprint column by name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q={{sprintName}}&fields=sprint&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{sprintName}}"
+                },
+                {
+                  "key": "fields",
+                  "value": "sprint"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Same trick for the `relation` column: sprint name → page id → `relation.contains`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search page bodies only",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=barcode&fields=page_content&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "barcode"
+                },
+                {
+                  "key": "fields",
+                  "value": "page_content"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Only the indexed page-body text. Useful for acceptance criteria and API details, which live in the body rather than in any property."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search by Story ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=STORY-03&fields=story_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "STORY-03"
+                },
+                {
+                  "key": "fields",
+                  "value": "story_id"
+                }
+              ]
+            },
+            "description": "Prefix search over the Story ID column."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Include the opt-in fields (Source Team / Source Type)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=FE&fields=source_team,source_type&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "FE"
+                },
+                {
+                  "key": "fields",
+                  "value": "source_team,source_type"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "`source_team` and `source_type` are off by default; name them explicitly to search them."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Case-insensitivity check (UPPERCASE term)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=SUPPLIER&page_size=3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "SUPPLIER"
+                },
+                {
+                  "key": "page_size",
+                  "value": "3"
+                }
+              ]
+            },
+            "description": "Matching is case-insensitive on both the Notion side and in the body index — this returns the same total as the lowercase `supplier` search."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Term that matches nothing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=zzzz-no-such-text",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "zzzz-no-such-text"
+                }
+              ]
+            },
+            "description": "Empty result set, `total: 0`, HTTP 200 — not an error."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('empty but successful', () => pm.expect(pm.response.json().total).to.eql(0));",
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 · Assignee filter",
+      "item": [
+        {
+          "name": "By partial name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?assignee={{assigneeName}}&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "{{assigneeName}}"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Accepts a partial, case-insensitive name. Resolved to a user id before filtering."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "By user id (uuid)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?assignee={{assigneeId}}&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "{{assigneeId}}"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "The exact form Notion itself uses: `{ property: \"Assignees\", people: { contains: <uuid> } }`.\n\nRequires **Filter instructions** to have run first. This is the only way to filter the workspace guest whose name the integration cannot read."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "By email",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?assignee={{assigneeEmail}}&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "{{assigneeEmail}}"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Emails resolve through the same directory lookup as names."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unassigned tasks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?assignee=none&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "none"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "`none` (or `unassigned`) maps to `people.is_empty: true`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Two assignees at once (OR)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?assignee={{assigneeName}},{{assigneeId}}&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "{{assigneeName}},{{assigneeId}}"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Repeated/comma-separated values inside one parameter are OR-ed together."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown assignee → notice, not a crash",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?assignee=nobody-here",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "nobody-here"
+                }
+              ]
+            },
+            "description": "Unresolvable value returns HTTP 200 with an empty result set and a `notice` pointing at `/api/filters`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('carries a notice', () => pm.expect(d.notice).to.include('Unknown assignee'));",
+                  "pm.test('no results', () => pm.expect(d.total).to.eql(0));",
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 · Sprint filter",
+      "item": [
+        {
+          "name": "By sprint name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?sprint={{sprintName}}&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "sprint",
+                  "value": "{{sprintName}}"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "By sprint page id (uuid)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?sprint={{sprintId}}&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "sprint",
+                  "value": "{{sprintId}}"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "`{ property: \"Sprint\", relation: { contains: <page_id> } }`. Requires **Filter instructions** to have run first."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Two sprints at once (OR)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?sprint=Sprint%201,Sprint%202&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "sprint",
+                  "value": "Sprint 1,Sprint 2"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Comma-separated values are OR-ed."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tasks with no sprint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?sprint=none&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "sprint",
+                  "value": "none"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Maps to `relation.is_empty: true`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown sprint → notice",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?sprint=Sprint%2099",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "sprint",
+                  "value": "Sprint 99"
+                }
+              ]
+            },
+            "description": "Same graceful handling as an unknown assignee."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('carries a notice', () =>",
+                  "  pm.expect(pm.response.json().notice).to.include('Unknown sprint'));",
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 · Status, priority & combined",
+      "item": [
+        {
+          "name": "By status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?status=Dev%20Completed&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "Dev Completed"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Exact status name. Full list comes from `/api/options`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Several statuses (OR)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?status=Backlog,To%20Do,In%20Progress&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "Backlog,To Do,In Progress"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "By priority",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?priority=P0%20-%20Critical&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "priority",
+                  "value": "P0 - Critical"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Status AND priority",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?status=Dev%20Completed&priority=P0%20-%20Critical&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "Dev Completed"
+                },
+                {
+                  "key": "priority",
+                  "value": "P0 - Critical"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Different parameters are AND-ed; values inside one parameter are OR-ed."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Everything combined",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=order&assignee={{assigneeName}}&sprint={{sprintName}}&status=Backlog&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "order"
+                },
+                {
+                  "key": "assignee",
+                  "value": "{{assigneeName}}"
+                },
+                {
+                  "key": "sprint",
+                  "value": "{{sprintName}}"
+                },
+                {
+                  "key": "status",
+                  "value": "Backlog"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Text AND assignee AND sprint AND status. Inspect `notion_filter` in the response to see the exact filter object sent to Notion."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unassigned AND no sprint (backlog hygiene)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?assignee=none&sprint=none&page_size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "assignee",
+                  "value": "none"
+                },
+                {
+                  "key": "sprint",
+                  "value": "none"
+                },
+                {
+                  "key": "page_size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Finds rows that slipped through triage."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 · Pagination",
+      "item": [
+        {
+          "name": "Page 1 — five per page",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Take `next_cursor` from the response and pass it as `offset` for the next page."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.collectionVariables.set('nextOffset', d.next_cursor || '0');",
+                  "pm.test('has a next cursor', () => pm.expect(d.has_more).to.eql(true));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Page 2 — using the captured cursor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?page_size=5&offset={{nextOffset}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "page_size",
+                  "value": "5"
+                },
+                {
+                  "key": "offset",
+                  "value": "{{nextOffset}}"
+                }
+              ]
+            },
+            "description": "`offset` and `start_cursor` are accepted interchangeably."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Page 2 — explicit offset",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?page_size=5&offset=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "page_size",
+                  "value": "5"
+                },
+                {
+                  "key": "offset",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Maximum page size",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?page_size=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "page_size",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "100 is the ceiling."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Over-large page_size is clamped to 100",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?page_size=500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "page_size",
+                  "value": "500"
+                }
+              ]
+            },
+            "description": "No error — the value is clamped."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('clamped to 100', () =>",
+                  "  pm.expect(pm.response.json().count).to.be.at.most(100));",
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 · POST (JSON body)",
+      "item": [
+        {
+          "name": "POST — same options as the query string",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ]
+            },
+            "description": "`POST /api/search` accepts the identical keys as JSON. Arrays are OR-ed, which avoids escaping commas in values.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": \"barcode\",\n  \"sprint\": [\n    \"Sprint 1\"\n  ],\n  \"page_size\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST — arrays for assignee and status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ]
+            },
+            "description": "`fields` may also be an array here.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee\": [\n    \"{{assigneeName}}\"\n  ],\n  \"status\": [\n    \"Backlog\",\n    \"To Do\"\n  ],\n  \"fields\": [\n    \"summary\",\n    \"description\",\n    \"page_content\"\n  ],\n  \"q\": \"order\",\n  \"page_size\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST — empty body returns everything",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ]
+            },
+            "description": "No keys means no filter.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 · Edge cases",
+      "item": [
+        {
+          "name": "Unknown field names are ignored",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=supplier&fields=bogus_field,summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "supplier"
+                },
+                {
+                  "key": "fields",
+                  "value": "bogus_field,summary"
+                }
+              ]
+            },
+            "description": "Unrecognised keys in `fields` are dropped; the valid ones still apply."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Empty q behaves as no text filter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=&status=Backlog",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": ""
+                },
+                {
+                  "key": "status",
+                  "value": "Backlog"
+                }
+              ]
+            },
+            "description": "A blank `q` is ignored, leaving only the structured filters."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown route → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/does-not-exist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "does-not-exist"
+              ]
+            },
+            "description": "Express default 404 — confirms you are hitting the right server."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3100",
+      "type": "string"
+    },
+    {
+      "key": "assigneeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "assigneeName",
+      "value": "Lucas",
+      "type": "string"
+    },
+    {
+      "key": "assigneeEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sprintId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sprintName",
+      "value": "Sprint 1",
+      "type": "string"
+    },
+    {
+      "key": "nextOffset",
+      "value": "0",
+      "type": "string"
+    }
+  ]
+}

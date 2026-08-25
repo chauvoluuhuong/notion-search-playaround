@@ -19,6 +19,55 @@ npm start        # http://localhost:3100
 Credentials live in `.env` (git-ignored). Port is 3100 because 3000 was already
 taken on this machine.
 
+### Testing the API
+
+**Postman:** import [`postman_collection.json`](postman_collection.json)
+(*Import → File*). 45 requests in 8 folders, every one a read — safe to run with
+the Collection Runner.
+
+Set the `baseUrl` variable if you are not on `http://localhost:3100`, then run
+**01 · Health & metadata → Filter instructions** first: its test script captures
+`{{assigneeId}}`, `{{assigneeName}}`, `{{assigneeEmail}}`, `{{sprintId}}` and
+`{{sprintName}}`, which the *by id* and *by email* requests use.
+
+| Folder | Covers |
+|---|---|
+| 01 · Health & metadata | health, options, the filter instruction API, cache refresh |
+| 02 · Text search | free text, field-limited text, page-body-only text, opt-in fields, case-insensitivity, no-match |
+| 03 · Assignee filter | by name, id, email, `none`, OR of two, unknown value |
+| 04 · Sprint filter | by name, page id, OR of two, `none`, unknown value |
+| 05 · Status, priority & combined | single, OR, AND across parameters |
+| 06 · Pagination | cursor chaining, max page size, clamping |
+| 07 · POST | JSON body, arrays, empty body |
+| 08 · Edge cases | unknown field keys, empty `q`, 404 |
+
+Two requests in *02* are deliberately paired: `q=not-found response` returns 1
+result, and the same term with `page_content` disabled returns 0 — a live
+demonstration of what Notion's own filters cannot reach.
+
+**Plain curl:** [`curl-examples.sh`](curl-examples.sh) has the same 45 calls as
+copy-pasteable commands with real ids filled in. Postman's *Import → Raw text*
+takes one cURL command at a time, so use the collection for the whole suite.
+
+### Shell smoke test
+
+[`test-api.sh`](test-api.sh) exercises every endpoint and doubles as a set of
+worked examples — it prints the exact `curl` for each case next to a digest of
+the response.
+
+```bash
+./test-api.sh                    # summary line per request
+RAW=1 ./test-api.sh              # full JSON for every request
+./test-api.sh sprint             # only cases whose label matches "sprint"
+BASE=http://host:port ./test-api.sh
+```
+
+17 cases: health, options, the filter instruction API, free text, field-limited
+text, page-body-only text (plus the same term with `page_content` disabled, which
+returns 0 and shows why Notion alone cannot find it), assignee/sprint/status/
+priority filters, `none` handling, pagination, `POST`, and the unknown-value
+path. Exits non-zero if any request does not return 200.
+
 ### Using the form
 
 - **Every match is shown**, not a first page — the form keeps requesting pages
@@ -230,4 +279,7 @@ src/content.js       page-body index (the part Notion cannot filter on)
 src/search.js        Notion filter builder + text matching + result shaping
 src/filters.js       the /api/filters instruction document
 public/index.html    the search form (no build step)
+test-api.sh          curl smoke-test / worked examples for every endpoint
+postman_collection.json  importable Postman collection (45 requests)
+curl-examples.sh     the same 45 calls as plain curl commands
 ```
