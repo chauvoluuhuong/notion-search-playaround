@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engineering Issue Tracker — Search</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --panel:#fff; --ink:#1e1d1a; --muted:#6b6a65; --line:#e3e2dd;
+    --accent:#2563eb; --accent-soft:#e8efff; --mark:#fff2a8; --chip:#f0efec;
+    --radius:10px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#191918; --panel:#232322; --ink:#eceae5; --muted:#a09e97; --line:#33322f;
+           --accent:#7aa2ff; --accent-soft:#22304d; --mark:#6b5b1e; --chip:#2d2c2a; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 64px}
+  header h1{font-size:20px;margin:0 0 4px;letter-spacing:-.01em}
+  header p{margin:0 0 20px;color:var(--muted);font-size:13.5px}
+  header a{color:var(--accent)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .searchrow{display:flex;gap:10px}
+  .searchrow input[type=search]{flex:1;min-width:0;padding:11px 13px;font-size:15px;
+       border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+  .searchrow input[type=search]:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
+         background:var(--panel);color:var(--ink);padding:10px 14px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;padding:11px 22px}
+  button:hover{filter:brightness(1.04)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:16px}
+  label.lbl{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
+            color:var(--muted);font-weight:600;margin-bottom:6px}
+  .lblrow{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .lblrow .lbl{margin-bottom:6px}
+  .clearbtn{border:0;background:none;color:var(--accent);padding:0 0 6px;font-size:11.5px;
+            font-weight:600;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
+  .clearbtn[hidden]{display:none}
+  .clearbtn:hover{text-decoration:underline}
+  .active{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:16px 0 0}
+  .active:empty{display:none}
+  .active .lead{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
+                color:var(--muted);font-weight:600;margin-right:2px}
+  .fchip{display:inline-flex;align-items:center;gap:7px;background:var(--accent-soft);
+         color:var(--accent);border-radius:999px;padding:4px 6px 4px 11px;font-size:12.5px;font-weight:600}
+  .fchip span.k{opacity:.72;font-weight:500}
+  .fchip button{border:0;background:none;color:inherit;cursor:pointer;padding:0 4px;
+                font-size:14px;line-height:1;border-radius:999px;opacity:.7}
+  .fchip button:hover{opacity:1;background:rgba(127,127,127,.22)}
+  .clearall{border:0;background:none;color:var(--muted);font-size:12.5px;cursor:pointer;
+            text-decoration:underline;padding:4px 6px}
+  .clearall:hover{color:var(--ink)}
+  .progress{color:var(--muted);font-size:13px}
+  select{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;
+         background:var(--bg);color:var(--ink);font:inherit}
+  select[multiple]{height:112px}
+  .fields{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+  .fieldlist{display:flex;flex-wrap:wrap;gap:8px}
+  .fieldlist label{display:inline-flex;align-items:center;gap:6px;background:var(--chip);
+       border:1px solid transparent;border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer}
+  .fieldlist label:has(input:checked){background:var(--accent-soft);border-color:var(--accent)}
+  .actions{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+  .actions .spacer{flex:1}
+  .meta{color:var(--muted);font-size:13px;margin:22px 0 10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+        padding:15px 17px;margin-bottom:10px}
+  .card h3{margin:0 0 6px;font-size:15.5px;line-height:1.4}
+  .card h3 a{color:inherit;text-decoration:none}
+  .card h3 a:hover{color:var(--accent);text-decoration:underline}
+  .tid{color:var(--muted);font-weight:400;font-size:13px}
+  .row{font-size:13.5px;color:var(--muted);margin:3px 0}
+  .row b{color:var(--ink);font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .chip{background:var(--chip);border-radius:999px;padding:3px 10px;font-size:11.5px;color:var(--muted)}
+  .chip.hit{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 2px}
+  .empty{padding:34px;text-align:center;color:var(--muted)}
+  details.debug{margin-top:18px;font-size:13px;color:var(--muted)}
+  details.debug pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+       padding:12px;overflow:auto;font-size:12px;color:var(--ink)}
+  .err{background:#fee;border:1px solid #f5b5b5;color:#8a1c1c;padding:12px;border-radius:8px}
+  @media (prefers-color-scheme:dark){.err{background:#3a1d1d;border-color:#6b2b2b;color:#ffb4b4}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🛠️ Engineering Issue Tracker — Search</h1>
+    <p>Text search across Assignee, Summary, Description, Sprint, Task Name, Dependencies, Story ID and page body.
+       <strong>Page Content</strong> searches the body of each task page, which Notion's own database
+       filters cannot reach. Filter values come from <a href="/api/filters" target="_blank">/api/filters</a>.</p>
+  </header>
+
+  <form class="panel" id="form">
+    <div class="searchrow">
+      <input type="search" id="q" name="q" placeholder="Search text… (e.g. supplier, STORY-01, Lucas, Sprint 1)" autocomplete="off">
+      <button class="primary" type="submit">Search</button>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="lblrow"><label class="lbl" for="assignee">Assignee</label>
+          <button type="button" class="clearbtn" data-clear="assignee" hidden>clear</button></div>
+        <select id="assignee" multiple></select>
+      </div>
+      <div>
+        <div class="lblrow"><label class="lbl" for="sprint">Sprint</label>
+          <button type="button" class="clearbtn" data-clear="sprint" hidden>clear</button></div>
+        <select id="sprint" multiple></select>
+      </div>
+      <div>
+        <div class="lblrow"><label class="lbl" for="status">Status</label>
+          <button type="button" class="clearbtn" data-clear="status" hidden>clear</button></div>
+        <select id="status" multiple></select>
+      </div>
+      <div>
+        <div class="lblrow"><label class="lbl" for="priority">Priority</label>
+          <button type="button" class="clearbtn" data-clear="priority" hidden>clear</button></div>
+        <select id="priority" multiple></select>
+      </div>
+    </div>
+
+    <div class="fields">
+      <div class="lblrow"><label class="lbl">Search these fields</label>
+        <button type="button" class="clearbtn" data-clear="fields" hidden>reset to default</button></div>
+      <div class="fieldlist" id="fieldlist"></div>
+    </div>
+
+    <div class="active" id="active"></div>
+
+    <div class="actions">
+      <button type="button" id="reset">Clear all filters</button>
+      <span class="spacer"></span>
+      <span class="row">Hold ⌘/Ctrl to pick several. Nothing selected = no filter on that column.</span>
+    </div>
+  </form>
+
+  <div class="meta" id="meta"></div>
+  <div id="results"></div>
+  <div class="actions" id="morewrap" hidden>
+    <button id="more">Load the remaining results</button>
+  </div>
+
+  <details class="debug" id="debugwrap" hidden>
+    <summary>How this search was executed</summary>
+    <pre id="debug"></pre>
+  </details>
+</div>
+
+<script type="module">
+const $ = (s) => document.querySelector(s);
+const el = (t, cls, txt) => { const n = document.createElement(t); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
+
+const SELECTS = { assignee: 'Assignee', sprint: 'Sprint', status: 'Status', priority: 'Priority' };
+const PAGE = 100;           // rows per request; the API caps page_size at 100
+const AUTO_LOAD_LIMIT = 500; // beyond this, ask before pulling the rest
+
+let FIELDS = [];
+let LABELS = {};   // select id -> { value: label }
+let searchToken = 0;
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function highlight(text, q) {
+  if (!text) return '';
+  if (!q) return esc(text);
+  const re = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig');
+  return esc(text).replace(re, '<mark>$1</mark>');
+}
+
+// ---------------- setup ----------------
+
+async function boot() {
+  const [opts, filters] = await Promise.all([
+    fetch('/api/options').then((r) => r.json()),
+    fetch('/api/filters').then((r) => r.json()),
+  ]);
+
+  fill('assignee', [{ id: 'none', label: '— Unassigned —' },
+    ...opts.assignees.map((a) => ({ id: a.id, label: a.label, count: a.count }))]);
+  fill('sprint', [{ id: 'none', label: '— No sprint —' },
+    ...opts.sprints.map((s) => ({ id: s.id, label: s.label, count: s.count }))]);
+  fill('status', opts.statuses.map((s) => ({ id: s, label: s })));
+  fill('priority', opts.priorities.map((s) => ({ id: s, label: s })));
+
+  FIELDS = filters.text_search.fields;
+  const list = $('#fieldlist');
+  for (const f of FIELDS) {
+    const lab = el('label');
+    const cb = el('input');
+    cb.type = 'checkbox'; cb.value = f.key; cb.checked = f.searched_by_default;
+    cb.addEventListener('change', syncControls);
+    lab.append(cb, document.createTextNode(f.label));
+    lab.title = `${f.notion_property || 'page body'} · ${f.notion_type}`;
+    list.append(lab);
+  }
+  syncControls();
+  runSearch();
+}
+
+function fill(id, items) {
+  const sel = $('#' + id);
+  sel.innerHTML = '';
+  LABELS[id] = {};
+  for (const it of items) {
+    // The dropdown shows the task count; the filter chip uses the bare name.
+    sel.append(new Option(it.count ? `${it.label} (${it.count})` : it.label, it.id));
+    LABELS[id][it.id] = it.label;
+  }
+  sel.addEventListener('change', () => { syncControls(); runSearch(); });
+}
+
+const picked = (id) => [...$('#' + id).selectedOptions].map((o) => o.value);
+const checkedFields = () => [...$('#fieldlist').querySelectorAll('input:checked')].map((c) => c.value);
+const fieldsAreDefault = () => {
+  const now = checkedFields().sort().join();
+  return now === FIELDS.filter((f) => f.searched_by_default).map((f) => f.key).sort().join();
+};
+
+// ---------------- clearing ----------------
+
+function clearOne(key) {
+  if (key === 'fields') {
+    for (const cb of $('#fieldlist').querySelectorAll('input')) {
+      cb.checked = FIELDS.find((f) => f.key === cb.value)?.searched_by_default ?? false;
+    }
+  } else if (key === 'q') {
+    $('#q').value = '';
+  } else {
+    for (const o of $('#' + key).options) o.selected = false;
+  }
+  syncControls();
+  runSearch();
+}
+
+function clearValue(key, value) {
+  for (const o of $('#' + key).options) if (o.value === value) o.selected = false;
+  syncControls();
+  runSearch();
+}
+
+function clearAll() {
+  $('#q').value = '';
+  for (const key of Object.keys(SELECTS)) for (const o of $('#' + key).options) o.selected = false;
+  for (const cb of $('#fieldlist').querySelectorAll('input')) {
+    cb.checked = FIELDS.find((f) => f.key === cb.value)?.searched_by_default ?? false;
+  }
+  syncControls();
+  runSearch();
+}
+
+/** Keep the "clear" affordances and the active-filter chips in step with the form. */
+function syncControls() {
+  for (const key of Object.keys(SELECTS)) {
+    $(`.clearbtn[data-clear="${key}"]`).hidden = picked(key).length === 0;
+  }
+  $('.clearbtn[data-clear="fields"]').hidden = fieldsAreDefault();
+
+  const bar = $('#active');
+  bar.innerHTML = '';
+  const chips = [];
+  const q = $('#q').value.trim();
+  if (q) chips.push({ k: 'Text', label: `"${q}"`, onclear: () => clearOne('q') });
+  for (const [key, title] of Object.entries(SELECTS)) {
+    for (const v of picked(key)) {
+      chips.push({ k: title, label: LABELS[key][v] ?? v, onclear: () => clearValue(key, v) });
+    }
+  }
+  if (!fieldsAreDefault()) {
+    const names = checkedFields().map((k) => FIELDS.find((f) => f.key === k)?.label ?? k);
+    chips.push({ k: 'Fields', label: names.length ? names.join(', ') : 'none', onclear: () => clearOne('fields') });
+  }
+  if (!chips.length) return;
+
+  bar.append(el('span', 'lead', 'Filtering by'));
+  for (const c of chips) {
+    const chip = el('span', 'fchip');
+    chip.append(el('span', 'k', c.k + ':'), document.createTextNode(' ' + c.label));
+    const x = el('button', null, '×');
+    x.type = 'button';
+    x.title = `Remove ${c.k} filter`;
+    x.addEventListener('click', c.onclear);
+    chip.append(x);
+    bar.append(chip);
+  }
+  const all = el('button', 'clearall', 'Clear all');
+  all.type = 'button';
+  all.addEventListener('click', clearAll);
+  bar.append(all);
+}
+
+// ---------------- searching ----------------
+
+function collect() {
+  const p = new URLSearchParams();
+  const q = $('#q').value.trim();
+  if (q) p.set('q', q);
+  if (!fieldsAreDefault()) p.set('fields', checkedFields().join(','));
+  for (const key of Object.keys(SELECTS)) {
+    const v = picked(key);
+    if (v.length) p.set(key, v.join(','));
+  }
+  p.set('page_size', String(PAGE));
+  return p;
+}
+
+/** Fetch every matching row, not just the first page. */
+async function runSearch(startOffset = 0, params = null) {
+  const token = ++searchToken;
+  const base = params ?? collect();
+  const box = $('#results');
+  if (startOffset === 0) box.innerHTML = '';
+  $('#morewrap').hidden = true;
+
+  let offset = startOffset;
+  let shown = box.querySelectorAll('.card').length;
+  const q = base.get('q') || '';
+
+  while (true) {
+    $('#meta').textContent = shown ? `Loaded ${shown}…` : 'Searching…';
+
+    const p = new URLSearchParams(base);
+    if (offset) p.set('offset', String(offset));
+
+    let data;
+    try {
+      const res = await fetch('/api/search?' + p);
+      data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+    } catch (e) {
+      if (token !== searchToken) return;
+      $('#meta').textContent = '';
+      box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+      return;
+    }
+    if (token !== searchToken) return; // a newer search superseded this one
+
+    for (const r of data.results) box.append(card(r, q));
+    shown += data.results.length;
+    offset += data.results.length;
+
+    $('#debugwrap').hidden = !data.notion_filter && !data.text_matching;
+    $('#debug').textContent = JSON.stringify(
+      { notion_filter: data.notion_filter, text_matching: data.text_matching }, null, 2);
+
+    if (data.notice) { $('#meta').textContent = data.notice; return; }
+
+    if (!data.has_more) {
+      $('#meta').textContent = shown === 0 ? '' : `${data.total} result${data.total === 1 ? '' : 's'} — all shown`;
+      if (!shown) box.append(el('div', 'empty', 'No matching tasks.'));
+      return;
+    }
+
+    if (shown >= AUTO_LOAD_LIMIT) { // very large set: hand control back to the user
+      $('#meta').textContent = `${data.total} results — showing ${shown}`;
+      const more = $('#more');
+      more.textContent = `Load the remaining ${data.total - shown}`;
+      more.onclick = () => runSearch(offset, base);
+      $('#morewrap').hidden = false;
+      return;
+    }
+  }
+}
+
+function card(r, q) {
+  const c = el('div', 'card');
+  const h = el('h3');
+  h.innerHTML = `<a href="${esc(r.url)}" target="_blank" rel="noreferrer">${highlight(r.task_name, q)}</a>
+                 <span class="tid">#${esc(r.task_id ?? '')}</span>`;
+  c.append(h);
+
+  if (r.summary) c.append(rowLine('Summary', r.summary, q));
+  if (r.description) c.append(rowLine('Description', r.description, q));
+  if (r.story_id) c.append(rowLine('Story ID', r.story_id, q));
+  if (r.dependencies) c.append(rowLine('Dependencies', r.dependencies, q));
+  if (r.page_content) c.append(rowLine('Page body', r.page_content, q));
+
+  c.append(rowLine('Assignee', r.assignees.map((a) => a.label).join(', ') || '—', q));
+  c.append(rowLine('Sprint', r.sprint.map((s) => s.label).join(', ') || '—', q));
+
+  const chips = el('div', 'chips');
+  for (const [t, v] of [['Status', r.status], ['Priority', r.priority], ['Project', r.project]]) {
+    if (v) chips.append(el('span', 'chip', `${t}: ${v}`));
+  }
+  for (const m of r.matched_fields) chips.append(el('span', 'chip hit', `match: ${m}`));
+  c.append(chips);
+  return c;
+}
+
+function rowLine(label, value, q) {
+  const d = el('div', 'row');
+  d.innerHTML = `<b>${label}:</b> ${highlight(value, q)}`;
+  return d;
+}
+
+// ---------------- wiring ----------------
+
+$('#form').addEventListener('submit', (e) => { e.preventDefault(); syncControls(); runSearch(); });
+$('#q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); syncControls(); runSearch(); } });
+$('#q').addEventListener('input', () => { if (!$('#q').value.trim()) syncControls(); });
+$('#reset').addEventListener('click', clearAll);
+for (const b of document.querySelectorAll('.clearbtn')) {
+  b.addEventListener('click', () => clearOne(b.dataset.clear));
+}
+
+boot();
+</script>
+</body>
+</html>
