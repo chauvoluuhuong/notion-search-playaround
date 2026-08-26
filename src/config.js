@@ -41,6 +41,8 @@ export const SEARCH_FIELDS = [
   // Body text of the task page. Notion database filters cannot see this, so it
   // is indexed by src/content.js and matched in-process.
   { key: 'page_content', property: null,            type: 'page_content', default: true, label: 'Page Content' },
+  // Comment threads on the task page. Also invisible to Notion database filters.
+  { key: 'comment',      property: null,            type: 'comments',     default: true, label: 'Comments' },
 ];
 
 export const FIELD_BY_KEY = Object.fromEntries(SEARCH_FIELDS.map((f) => [f.key, f]));
@@ -48,6 +50,10 @@ export const DEFAULT_FIELD_KEYS = SEARCH_FIELDS.filter((f) => f.default).map((f)
 
 // Relation target databases, used to resolve relation page ids -> human labels.
 export const SPRINT_DATABASE_ID = '641ea2c04eb383d799c281b99aad17c3';
+
+// Inline (block-level) comments cost one API call per block rather than per
+// page, so they are opt-in. Page-level comments are always indexed.
+export const INDEX_INLINE_COMMENTS = process.env.INDEX_INLINE_COMMENTS === '1';
 
 export const ASSIGNEE_PROPERTY = 'Assignees';
 export const SPRINT_PROPERTY = 'Sprint';

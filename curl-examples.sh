@@ -64,6 +64,18 @@ curl -sS "$BASE/api/search?q=Lucas%20Luu&fields=assignee&page_size=5"
 #   Same trick for the relation column: sprint name → page id → relation.contains.
 curl -sS "$BASE/api/search?q=Sprint%201&fields=sprint&page_size=5"
 
+# Search COMMENTS only
+#   Searches comment threads on each task page.
+curl -sS "$BASE/api/search?q=blocked&fields=comment&page_size=5"
+
+# Page body AND comments together
+#   The two non-property sources combined. matched_fields tells you which one hit.
+curl -sS "$BASE/api/search?q=review&fields=page_content%2Ccomment&page_size=5"
+
+# Everything except comments
+#   Baseline for comparing against the comments-only search above.
+curl -sS "$BASE/api/search?q=blocked&fields=summary%2Cdescription%2Ctask_name%2Cpage_content&page_size=5"
+
 # Search page bodies only
 #   Only the indexed page-body text. Useful for acceptance criteria and API details, which live in the body rather than in any property.
 curl -sS "$BASE/api/search?q=barcode&fields=page_content&page_size=5"

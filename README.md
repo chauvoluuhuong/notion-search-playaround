@@ -2,7 +2,8 @@
 
 Search form + filter API over the Notion database
 **🛠️ Engineering Issue Tracker** (`f30ea2c04eb3824082c081891bee91a1`), including the
-body text of each task page — which Notion's own database filters cannot reach.
+body text and comments of each task page — neither of which Notion's own database
+filters can reach.
 
 ```bash
 npm install
@@ -22,7 +23,7 @@ taken on this machine.
 ### Testing the API
 
 **Postman:** import [`postman_collection.json`](postman_collection.json)
-(*Import → File*). 45 requests in 8 folders, every one a read — safe to run with
+(*Import → File*). 48 requests in 8 folders, every one a read — safe to run with
 the Collection Runner.
 
 Set the `baseUrl` variable if you are not on `http://localhost:3100`, then run
@@ -33,7 +34,7 @@ Set the `baseUrl` variable if you are not on `http://localhost:3100`, then run
 | Folder | Covers |
 |---|---|
 | 01 · Health & metadata | health, options, the filter instruction API, cache refresh |
-| 02 · Text search | free text, field-limited text, page-body-only text, opt-in fields, case-insensitivity, no-match |
+| 02 · Text search | free text, field-limited text, page-body-only text, comments-only, body+comments, opt-in fields, case-insensitivity, no-match |
 | 03 · Assignee filter | by name, id, email, `none`, OR of two, unknown value |
 | 04 · Sprint filter | by name, page id, OR of two, `none`, unknown value |
 | 05 · Status, priority & combined | single, OR, AND across parameters |
@@ -45,28 +46,21 @@ Two requests in *02* are deliberately paired: `q=not-found response` returns 1
 result, and the same term with `page_content` disabled returns 0 — a live
 demonstration of what Notion's own filters cannot reach.
 
-**Plain curl:** [`curl-examples.sh`](curl-examples.sh) has the same 45 calls as
+**Plain curl:** [`curl-examples.sh`](curl-examples.sh) has the same 48 calls as
 copy-pasteable commands with real ids filled in. Postman's *Import → Raw text*
 takes one cURL command at a time, so use the collection for the whole suite.
 
-### Shell smoke test
-
-[`test-api.sh`](test-api.sh) exercises every endpoint and doubles as a set of
-worked examples — it prints the exact `curl` for each case next to a digest of
-the response.
+### Unit tests
 
 ```bash
-./test-api.sh                    # summary line per request
-RAW=1 ./test-api.sh              # full JSON for every request
-./test-api.sh sprint             # only cases whose label matches "sprint"
-BASE=http://host:port ./test-api.sh
+npm test
 ```
 
-17 cases: health, options, the filter instruction API, free text, field-limited
-text, page-body-only text (plus the same term with `page_content` disabled, which
-returns 0 and shows why Notion alone cannot find it), assignee/sprint/status/
-priority filters, `none` handling, pagination, `POST`, and the unknown-value
-path. Exits non-zero if any request does not return 200.
+Covers comment matching against a synthetic index (`test/comment-search.test.mjs`),
+so the behaviour is verifiable even while the workspace has no comments in it:
+matching, case-insensitivity, inline comments, excerpt/author shaping, the
+`comment_count` vs returned-threads distinction, and that comment text never
+leaks into results when `q` is empty.
 
 ### Using the form
 
@@ -120,8 +114,9 @@ over the block tree, 5-minute cache) and matches that text in-process. The
 excerpt and a `match: page_content` chip.
 
 Currently 73 of the 81 pages have body text (~36k characters), so the whole index
-is trivial to hold in memory. The first search after a cold start pays ~6s to
-build it; subsequent searches are ~1s.
+is trivial to hold in memory. The first search after a cold start pays ~10s to
+build it (page bodies plus one comments call per page); subsequent searches are
+~1s.
 
 Every response says exactly how the text was matched:
 
@@ -139,6 +134,59 @@ Every response says exactly how the text was matched:
 ```
 
 Drop `page_content` from `fields` to get pure Notion-side behaviour.
+
+---
+
+## Comments (`comment`)
+
+Comments are not a property either, so the same approach applies: they are read
+via `GET /v1/comments` during the index pass and matched in-process. The
+`comment` field is on by default.
+
+A matching row returns **only the threads that hit**, each with an excerpt,
+resolved author and timestamp, alongside `comment_count` for the page total:
+
+```jsonc
+{
+  "task_id": "4",
+  "comment_count": 2,
+  "comments": [{
+    "text": "Blocked on the payment gateway sandbox credentials — pinged infra.",
+    "excerpt": "…payment gateway sandbox credentials…",
+    "author": "Lucas Luu",
+    "created_time": "2026-08-01T10:00:00.000Z",
+    "inline": false
+  }],
+  "matched_fields": ["comment"]
+}
+```
+
+### Two limitations worth knowing
+
+**Notion only exposes unresolved comments.** Once a thread is resolved in the
+UI it is no longer returned by the API, so it cannot be indexed and cannot be
+searched. There is no API-side workaround. `/api/filters` states this under
+`text_search.comment_search.limitation`.
+
+**Inline comments are opt-in.** A comment anchored to the page shows up on the
+page itself, but one anchored to a block inside the page needs a separate
+request *per block* — roughly 5–10× the API calls. Page-level comments are
+always indexed; set `INDEX_INLINE_COMMENTS=1` to include block-level ones.
+
+### The workspace currently has no comments
+
+At the time of writing this table has **zero** unresolved comments — none at
+page level across all 81 pages, and none inline across a sampled 104 blocks. So
+a comment search legitimately returns nothing today. Confirm with:
+
+```bash
+curl -s "http://localhost:3100/api/search?q=anything&fields=comment" \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['text_matching']['comment'])"
+```
+
+If `comments_indexed` is 0, there is nothing to find rather than something
+broken. Add a comment in Notion, wait out the 5-minute cache (or call
+`/api/options?refresh=1`), and it becomes searchable.
 
 ---
 
@@ -275,11 +323,11 @@ server.js            routes
 src/config.js        env + the field map (edit SEARCH_FIELDS to add a column)
 src/notion.js        Notion REST client + property readers
 src/directory.js     assignee & sprint value discovery, name→id resolution, cache
-src/content.js       page-body index (the part Notion cannot filter on)
+src/content.js       page-body + comment index (what Notion cannot filter on)
 src/search.js        Notion filter builder + text matching + result shaping
 src/filters.js       the /api/filters instruction document
 public/index.html    the search form (no build step)
-test-api.sh          curl smoke-test / worked examples for every endpoint
-postman_collection.json  importable Postman collection (45 requests)
-curl-examples.sh     the same 45 calls as plain curl commands
+test/                unit tests for comment matching
+postman_collection.json  importable Postman collection (48 requests)
+curl-examples.sh     the same 48 calls as plain curl commands
 ```

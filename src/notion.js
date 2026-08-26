@@ -32,6 +32,9 @@ export const listUsers = (cursor) =>
   request('GET', `/users?page_size=100${cursor ? `&start_cursor=${cursor}` : ''}`);
 export const getBlockChildren = (blockId, cursor) =>
   request('GET', `/blocks/${blockId}/children?page_size=100${cursor ? `&start_cursor=${cursor}` : ''}`);
+// Returns UNRESOLVED comments only — Notion exposes no way to read resolved threads.
+export const getComments = (blockId, cursor) =>
+  request('GET', `/comments?block_id=${blockId}&page_size=100${cursor ? `&start_cursor=${cursor}` : ''}`);
 
 /** Query every page of a database (used for the small Sprint table). */
 export async function queryAll(id, body = {}) {

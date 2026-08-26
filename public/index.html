@@ -76,6 +76,10 @@
   .chip{background:var(--chip);border-radius:999px;padding:3px 10px;font-size:11.5px;color:var(--muted)}
   .chip.hit{background:var(--accent-soft);color:var(--accent);font-weight:600}
   mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 2px}
+  .cmt{font-size:13.5px;color:var(--muted);margin:5px 0 0 2px;padding:4px 0 4px 11px;
+       border-left:2px solid var(--accent)}
+  .cmt .who{color:var(--ink);font-weight:600}
+  .cmt .when{opacity:.7;font-size:12px}
   .empty{padding:34px;text-align:center;color:var(--muted)}
   details.debug{margin-top:18px;font-size:13px;color:var(--muted)}
   details.debug pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
@@ -88,8 +92,8 @@
 <div class="wrap">
   <header>
     <h1>🛠️ Engineering Issue Tracker — Search</h1>
-    <p>Text search across Assignee, Summary, Description, Sprint, Task Name, Dependencies, Story ID and page body.
-       <strong>Page Content</strong> searches the body of each task page, which Notion's own database
+    <p>Text search across Assignee, Summary, Description, Sprint, Task Name, Dependencies, Story ID, page body and comments.
+       <strong>Page Content</strong> and <strong>Comments</strong> search what Notion's own database
        filters cannot reach. Filter values come from <a href="/api/filters" target="_blank">/api/filters</a>.</p>
   </header>
 
@@ -376,6 +380,15 @@ function card(r, q) {
   if (r.dependencies) c.append(rowLine('Dependencies', r.dependencies, q));
   if (r.page_content) c.append(rowLine('Page body', r.page_content, q));
 
+  for (const cm of r.comments || []) {
+    const d = el('div', 'cmt');
+    const who = cm.author ? `${esc(cm.author)}` : 'Comment';
+    const when = cm.created_time ? ` <span class="when">${esc(cm.created_time.slice(0, 10))}</span>` : '';
+    const tag = cm.inline ? ' <span class="when">· inline</span>' : '';
+    d.innerHTML = `<span class="who">💬 ${who}</span>${when}${tag}<br>${highlight(cm.excerpt || cm.text, q)}`;
+    c.append(d);
+  }
+
   c.append(rowLine('Assignee', r.assignees.map((a) => a.label).join(', ') || '—', q));
   c.append(rowLine('Sprint', r.sprint.map((s) => s.label).join(', ') || '—', q));
 
@@ -383,6 +396,7 @@ function card(r, q) {
   for (const [t, v] of [['Status', r.status], ['Priority', r.priority], ['Project', r.project]]) {
     if (v) chips.append(el('span', 'chip', `${t}: ${v}`));
   }
+  if (r.comment_count) chips.append(el('span', 'chip', `💬 ${r.comment_count}`));
   for (const m of r.matched_fields) chips.append(el('span', 'chip hit', `match: ${m}`));
   c.append(chips);
   return c;

@@ -93,7 +93,7 @@ async function fetchCandidates(filter) {
   return { rows, truncated: true };
 }
 
-function shape(page, directory, body) {
+function shape(page, directory, body, comments) {
   const p = page.properties;
   const get = (name) => readProperty(p[name]);
   const sprintIds = get('Sprint') || [];
@@ -123,6 +123,11 @@ function shape(page, directory, body) {
     due_date: get('Due Date'),
     last_edited_time: page.last_edited_time,
     page_content: body || null,
+    comments: (comments || []).map((c) => ({
+      ...c,
+      author: directory.assignees.find((a) => a.id === c.author_id)?.label
+        || (c.author_id ? `User ${c.author_id.slice(0, 8)}…` : null),
+    })),
   };
 }
 
@@ -144,6 +149,9 @@ function matchFields(row, q, fields, directory) {
       case 'page_content':
         if (hit(row.page_content)) out.push(f.key);
         break;
+      case 'comment':
+        if (row.comments.some((c) => hit(c.text))) out.push(f.key);
+        break;
       default:
         if (hit(row[f.key])) out.push(f.key);
     }
@@ -163,16 +171,18 @@ export async function search(params) {
   const keys = asArray(params.fields).filter((k) => FIELD_BY_KEY[k]);
   const fields = (keys.length ? keys : DEFAULT_FIELD_KEYS).map((k) => FIELD_BY_KEY[k]);
   const wantsBody = fields.some((f) => f.key === 'page_content');
+  const wantsComments = fields.some((f) => f.key === 'comment');
 
   const pageSize = Math.min(Math.max(Number(params.page_size) || 25, 1), 100);
   const offset = Math.max(Number(params.offset ?? params.start_cursor) || 0, 0);
 
   const [{ rows, truncated }, content] = await Promise.all([
     fetchCandidates(filter),
-    q && wantsBody ? getContentIndex() : Promise.resolve(null),
+    q && (wantsBody || wantsComments) ? getContentIndex() : Promise.resolve(null),
   ]);
 
-  let shaped = rows.map((p) => shape(p, directory, content?.textById.get(p.id) ?? null));
+  let shaped = rows.map((p) =>
+    shape(p, directory, content?.textById.get(p.id) ?? null, content?.commentsById.get(p.id) ?? []));
 
   let textMatching = null;
   if (q) {
@@ -190,6 +200,15 @@ export async function search(params) {
             pages_indexed: content?.pages_indexed ?? 0,
             indexed_at: content?.built_at ?? null }
         : null,
+      comment: wantsComments
+        ? { matched_in_process: true,
+            reason: 'Notion database filters cannot read comments.',
+            comments_indexed: content?.comments_indexed ?? 0,
+            pages_with_comments: content?.pages_with_comments ?? 0,
+            inline_comments_indexed: content?.inline_comments_indexed ?? false,
+            caveat: 'Notion\'s API returns unresolved comments only; resolved threads cannot be read.',
+            indexed_at: content?.built_at ?? null }
+        : null,
     };
   } else {
     shaped = shaped.map((r) => ({ ...r, matched_fields: [] }));
@@ -200,6 +219,13 @@ export async function search(params) {
     ...r,
     page_content: q ? snippet(r.page_content, q) : null,
     page_content_chars: r.page_content ? r.page_content.length : 0,
+    comment_count: r.comments.length,
+    // Return only the threads that matched, not every comment on the page.
+    comments: q
+      ? r.comments
+          .filter((c) => c.text.toLowerCase().includes(q.toLowerCase()))
+          .map((c) => ({ ...c, excerpt: snippet(c.text, q) }))
+      : [],
   }));
 
   return {

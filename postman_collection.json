@@ -2,7 +2,7 @@
   "info": {
     "name": "Notion Search — Engineering Issue Tracker",
     "_postman_id": "6f3a1c40-7c8e-4a1e-9f21-notionsearch01",
-    "description": "Search + filter API over the Notion database **🛠️ Engineering Issue Tracker**.\n\n### Setup\n1. Start the server: `npm start` (defaults to `http://localhost:3100`).\n2. Adjust the `baseUrl` collection variable if you run on another host/port.\n3. **Run `01 · Health & metadata → Filter instructions` first.** Its test script captures `{{assigneeId}}`, `{{assigneeName}}`, `{{assigneeEmail}}`, `{{sprintId}}` and `{{sprintName}}`, which the *by id* and *by email* requests depend on.\n\nThe whole collection is safe to run with Postman's Collection Runner — every request is a read, nothing writes to Notion.\n\n### Things worth knowing\n- Values inside one parameter are **OR**-ed; different parameters are **AND**-ed.\n- Notion cannot text-match `people` or `relation` columns, so assignee and sprint names are resolved to ids before filtering.\n- Notion cannot see page **body** text at all. That text is indexed by this server and matched in-process — see the two paired requests in *02 · Text search*.\n- Unresolvable filter values return HTTP 200 with a `notice`, never a 4xx.",
+    "description": "Search + filter API over the Notion database **🛠️ Engineering Issue Tracker**.\n\n### Setup\n1. Start the server: `npm start` (defaults to `http://localhost:3100`).\n2. Adjust the `baseUrl` collection variable if you run on another host/port.\n3. **Run `01 · Health & metadata → Filter instructions` first.** Its test script captures `{{assigneeId}}`, `{{assigneeName}}`, `{{assigneeEmail}}`, `{{sprintId}}` and `{{sprintName}}`, which the *by id* and *by email* requests depend on.\n\nThe whole collection is safe to run with Postman's Collection Runner — every request is a read, nothing writes to Notion.\n\n### Things worth knowing\n- Values inside one parameter are **OR**-ed; different parameters are **AND**-ed.\n- Notion cannot text-match `people` or `relation` columns, so assignee and sprint names are resolved to ids before filtering.\n- Notion cannot see page **body** text or **comments** at all. Both are indexed by this server and matched in-process — see the paired requests in *02 · Text search*.\n- Comment search reads *unresolved* comments only; Notion exposes no way to read a resolved thread.\n- Unresolvable filter values return HTTP 200 with a `notice`, never a 4xx.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -484,6 +484,141 @@
               ]
             },
             "description": "Same trick for the `relation` column: sprint name → page id → `relation.contains`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search COMMENTS only",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=blocked&fields=comment&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "blocked"
+                },
+                {
+                  "key": "fields",
+                  "value": "comment"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Searches comment threads on each task page.\n\nComments are not a database property, so Notion cannot filter on them — this server reads them via `GET /v1/comments` and matches in-process. Matching rows return only the threads that hit, each with an excerpt, author and timestamp, plus `comment_count` for the page total.\n\n**Limitation:** Notion's API returns *unresolved* comments only. Once a thread is resolved in the UI it is no longer readable through the API and cannot be searched.\n\nCheck `text_matching.comment.comments_indexed` in the response — if it is 0, the workspace genuinely has no unresolved comments."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Page body AND comments together",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=review&fields=page_content,comment&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "review"
+                },
+                {
+                  "key": "fields",
+                  "value": "page_content,comment"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "The two non-property sources combined. `matched_fields` tells you which one hit."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Everything except comments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=blocked&fields=summary,description,task_name,page_content&page_size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "blocked"
+                },
+                {
+                  "key": "fields",
+                  "value": "summary,description,task_name,page_content"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Baseline for comparing against the comments-only search above."
           },
           "response": [],
           "event": [

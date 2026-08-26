@@ -1,5 +1,5 @@
-import { DATABASE_ID } from './config.js';
-import { getBlockChildren, queryDatabase } from './notion.js';
+import { DATABASE_ID, INDEX_INLINE_COMMENTS } from './config.js';
+import { getBlockChildren, getComments, queryDatabase } from './notion.js';
 
 const TTL_MS = 5 * 60 * 1000;
 const CONCURRENCY = 8;
@@ -16,13 +16,16 @@ function blockText(block) {
   return runs.map((t) => t.plain_text ?? '').join('');
 }
 
-async function pageText(pageId) {
+/** Body text plus the ids of every block, which inline comments hang off. */
+async function pageBody(pageId) {
   const parts = [];
+  const blockIds = [];
   let cursor;
   try {
     do {
       const res = await getBlockChildren(pageId, cursor);
       for (const b of res.results) {
+        blockIds.push(b.id);
         const t = blockText(b).trim();
         if (t) parts.push(t);
         // One level of nesting (toggles, list children, callouts) is enough here.
@@ -30,6 +33,7 @@ async function pageText(pageId) {
           try {
             const kids = await getBlockChildren(b.id);
             for (const k of kids.results) {
+              blockIds.push(k.id);
               const kt = blockText(k).trim();
               if (kt) parts.push(kt);
             }
@@ -39,9 +43,51 @@ async function pageText(pageId) {
       cursor = res.has_more ? res.next_cursor : undefined;
     } while (cursor);
   } catch {
-    return ''; // page body not shared with the integration
+    return { text: '', blockIds: [] }; // page body not shared with the integration
   }
-  return parts.join('\n');
+  return { text: parts.join('\n'), blockIds };
+}
+
+/**
+ * Comment threads on a page.
+ *
+ * Notion's comments endpoint returns only UNRESOLVED comments — once a thread
+ * is resolved in the UI it disappears from the API, so it cannot be indexed.
+ * Page-level comments are always fetched; inline (block-level) ones cost one
+ * request per block, so they are behind INDEX_INLINE_COMMENTS.
+ */
+async function pageComments(pageId, blockIds) {
+  const targets = [pageId, ...(INDEX_INLINE_COMMENTS ? blockIds : [])];
+  const out = [];
+  const seen = new Set();
+
+  for (const target of targets) {
+    let cursor;
+    try {
+      do {
+        const res = await getComments(target, cursor);
+        for (const c of res.results) {
+          if (seen.has(c.id)) continue;
+          seen.add(c.id);
+          const text = (c.rich_text || []).map((t) => t.plain_text ?? '').join('').trim();
+          if (!text) continue;
+          out.push({
+            id: c.id,
+            text,
+            author_id: c.created_by?.id ?? null,
+            created_time: c.created_time ?? null,
+            discussion_id: c.discussion_id ?? null,
+            inline: target !== pageId,
+          });
+        }
+        cursor = res.has_more ? res.next_cursor : undefined;
+      } while (cursor);
+    } catch {
+      // No "read comments" capability, or the target is not readable.
+    }
+  }
+  out.sort((a, b) => String(a.created_time).localeCompare(String(b.created_time)));
+  return out;
 }
 
 async function pool(items, worker, size = CONCURRENCY) {
@@ -72,17 +118,41 @@ async function build() {
     cursor = page.next_cursor;
   }
 
-  const texts = await pool(rows, (p) => pageText(p.id));
+  const built = await pool(rows, async (p) => {
+    const body = await pageBody(p.id);
+    const comments = await pageComments(p.id, body.blockIds);
+    return { text: body.text, comments };
+  });
+
   const textById = new Map();
-  rows.forEach((p, i) => textById.set(p.id, texts[i]));
+  const commentsById = new Map();
+  rows.forEach((p, i) => {
+    textById.set(p.id, built[i].text);
+    commentsById.set(p.id, built[i].comments);
+  });
+
+  const commentTotal = built.reduce((n, b) => n + b.comments.length, 0);
 
   return {
     textById,
+    commentsById,
     pages_indexed: rows.length,
-    pages_with_body: texts.filter(Boolean).length,
+    pages_with_body: built.filter((b) => b.text).length,
+    pages_with_comments: built.filter((b) => b.comments.length).length,
+    comments_indexed: commentTotal,
+    inline_comments_indexed: INDEX_INLINE_COMMENTS,
     truncated: rows.length >= MAX_PAGES,
     built_at: new Date().toISOString(),
   };
+}
+
+/**
+ * Seed the cache directly. Used to warm the index at boot, and by tests to
+ * exercise matching without depending on live workspace content.
+ */
+export function primeIndex(value) {
+  cache = { at: Date.now(), value };
+  return value;
 }
 
 export async function getContentIndex({ refresh = false } = {}) {

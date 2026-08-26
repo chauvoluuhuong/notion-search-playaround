@@ -52,10 +52,19 @@ export async function filterInstructions({ refresh = false } = {}) {
               ? 'Notion cannot text-match a relation column. The term is resolved against filters[1].values first, then filtered by page id.'
               : f.type === 'page_content'
                 ? 'Body text of the task page, not a property. Notion database filters cannot read it at all, so it is indexed by this server and matched in-process.'
-                : undefined,
+                : f.type === 'comments'
+                  ? 'Comment threads on the task page. Not a property either, so it is indexed by this server. Notion returns UNRESOLVED comments only — a resolved thread cannot be read back through the API and therefore cannot be searched.'
+                  : undefined,
       })),
       caveat:
-        'A Notion database query only ever sees properties. Text living in the body of a task page is matched by this server, not by Notion — disable the page_content field to get pure Notion-side behaviour.',
+        'A Notion database query only ever sees properties. Page body text and comments are matched by this server, not by Notion — drop the page_content and comment fields to get pure Notion-side behaviour.',
+      comment_search: {
+        source: 'GET /v1/comments per page (and per block when INDEX_INLINE_COMMENTS=1)',
+        limitation:
+          'Notion exposes unresolved comments only. Once a thread is resolved in the UI it is no longer returned by the API, so it cannot be indexed or searched.',
+        inline_comments:
+          'Comments anchored to a block inside the page need one request per block, so they are opt-in via the INDEX_INLINE_COMMENTS=1 environment variable.',
+      },
     },
 
     filters: [
