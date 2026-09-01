@@ -1,213 +1,440 @@
-import {
-  ASSIGNEE_PROPERTY, DATABASE_ID, DEFAULT_FIELD_KEYS, FIELD_BY_KEY, SPRINT_PROPERTY,
-} from './config.js';
-import { queryDatabase, readProperty } from './notion.js';
-import { getDirectory, isUuid, resolveValues } from './directory.js';
+import { resolveDatabaseId, isUuid } from './databases.js';
+import { getDatabaseSchema, resolveValues } from './directory.js';
 import { getContentIndex, snippet } from './content.js';
+import { queryDatabase, readProperty } from './notion.js';
 
-const MAX_CANDIDATE_PAGES = 10; // 1000 rows
+const MAX_CANDIDATE_PAGES = 10; // up to 1000 rows
 
-const asArray = (v) =>
-  v == null ? [] : Array.isArray(v) ? v : String(v).split(',').map((s) => s.trim()).filter(Boolean);
+const asArray = (v) => {
+  if (v == null) return [];
+  if (Array.isArray(v)) return v;
+  return String(v)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
 
-/** The Notion-side filter: everything Notion can evaluate itself. */
-function idGroup(values, entries, property, kind) {
+const slugify = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+
+/**
+ * Build a Notion filter group for people or relation properties by resolving human names to UUIDs.
+ */
+function resolveIdFilter(values, entries, propertyName, notionKind) {
   const ids = new Set();
   let includeEmpty = false;
+
   for (const raw of values) {
     const v = String(raw).trim();
     if (!v) continue;
-    if (v.toLowerCase() === 'none' || v.toLowerCase() === 'unassigned') { includeEmpty = true; continue; }
+    if (v.toLowerCase() === 'none' || v.toLowerCase() === 'unassigned' || v.toLowerCase() === 'empty') {
+      includeEmpty = true;
+      continue;
+    }
     const hits = resolveValues(v, entries);
-    if (hits.length === 0 && !isUuid(v)) return { unmatched: v };
-    hits.forEach((id) => ids.add(id));
+    if (hits.length === 0 && !isUuid(v)) {
+      return { unmatched: v };
+    }
+    if (hits.length > 0) {
+      hits.forEach((id) => ids.add(id));
+    } else if (isUuid(v)) {
+      ids.add(v);
+    }
   }
-  const leaves = [...ids].map((id) => ({ property, [kind]: { contains: id } }));
-  if (includeEmpty) leaves.push({ property, [kind]: { is_empty: true } });
+
+  const leaves = [...ids].map((id) => ({ property: propertyName, [notionKind]: { contains: id } }));
+  if (includeEmpty) {
+    leaves.push({ property: propertyName, [notionKind]: { is_empty: true } });
+  }
+
   return { leaves, ids: [...ids] };
 }
 
-export async function buildQuery(params) {
-  const directory = await getDirectory();
+/**
+ * Build dynamic Notion query filter for any database based on its discovered schema.
+ */
+export async function buildQuery(databaseId, params = {}) {
+  const resolvedDbId = await resolveDatabaseId(databaseId);
+  const schema = await getDatabaseSchema(resolvedDbId);
   const and = [];
-  const resolved = { assignees: [], sprints: [] };
+  const resolved = {};
 
-  const assignee = asArray(params.assignee);
-  if (assignee.length) {
-    const g = idGroup(assignee, directory.assignees, ASSIGNEE_PROPERTY, 'people');
-    if (g.unmatched) return { error: `Unknown assignee "${g.unmatched}". See GET /api/filters for allowed values.` };
-    resolved.assignees = g.ids;
-    and.push(g.leaves.length === 1 ? g.leaves[0] : { or: g.leaves });
+  // Build a lookup for params: exact property name, lowercased, slugified
+  const paramMap = new Map();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') {
+      paramMap.set(k, v);
+      paramMap.set(k.toLowerCase(), v);
+      paramMap.set(slugify(k), v);
+    }
   }
 
-  const sprint = asArray(params.sprint);
-  if (sprint.length) {
-    const g = idGroup(sprint, directory.sprints, SPRINT_PROPERTY, 'relation');
-    if (g.unmatched) return { error: `Unknown sprint "${g.unmatched}". See GET /api/filters for allowed values.` };
-    resolved.sprints = g.ids;
-    and.push(g.leaves.length === 1 ? g.leaves[0] : { or: g.leaves });
-  }
+  for (const prop of schema.properties) {
+    const propName = prop.name;
+    const propType = prop.type;
+    const rawVal = paramMap.get(propName) ?? paramMap.get(propName.toLowerCase()) ?? paramMap.get(slugify(propName));
 
-  for (const [param, property, kind] of [['status', 'Status', 'status'], ['priority', 'Priority', 'select']]) {
-    const vals = asArray(params[param]);
-    if (!vals.length) continue;
-    const leaves = vals.map((v) => ({ property, [kind]: { equals: v } }));
-    and.push(leaves.length === 1 ? leaves[0] : { or: leaves });
+    if (rawVal === undefined || rawVal === null || rawVal === '') continue;
+
+    if (propType === 'people') {
+      const vals = asArray(rawVal);
+      if (vals.length) {
+        const users = schema.people_by_property[propName] || [];
+        const res = resolveIdFilter(vals, users, propName, 'people');
+        if (res.unmatched) {
+          return { error: `Unknown ${propName} "${res.unmatched}". See GET /api/filters for allowed values.` };
+        }
+        resolved[propName] = res.ids;
+        if (res.leaves.length) {
+          and.push(res.leaves.length === 1 ? res.leaves[0] : { or: res.leaves });
+        }
+      }
+    } else if (propType === 'relation') {
+      const vals = asArray(rawVal);
+      if (vals.length) {
+        const targets = schema.relations_by_property[propName] || [];
+        const res = resolveIdFilter(vals, targets, propName, 'relation');
+        if (res.unmatched) {
+          return { error: `Unknown ${propName} "${res.unmatched}". See GET /api/filters for allowed values.` };
+        }
+        resolved[propName] = res.ids;
+        if (res.leaves.length) {
+          and.push(res.leaves.length === 1 ? res.leaves[0] : { or: res.leaves });
+        }
+      }
+    } else if (propType === 'select' || propType === 'status') {
+      const vals = asArray(rawVal);
+      if (vals.length) {
+        const leaves = [];
+        for (const v of vals) {
+          if (v.toLowerCase() === 'none' || v.toLowerCase() === 'empty') {
+            leaves.push({ property: propName, [propType]: { is_empty: true } });
+          } else {
+            leaves.push({ property: propName, [propType]: { equals: v } });
+          }
+        }
+        if (leaves.length) {
+          and.push(leaves.length === 1 ? leaves[0] : { or: leaves });
+        }
+      }
+    } else if (propType === 'multi_select') {
+      const vals = asArray(rawVal);
+      if (vals.length) {
+        const leaves = [];
+        for (const v of vals) {
+          if (v.toLowerCase() === 'none' || v.toLowerCase() === 'empty') {
+            leaves.push({ property: propName, multi_select: { is_empty: true } });
+          } else {
+            leaves.push({ property: propName, multi_select: { contains: v } });
+          }
+        }
+        if (leaves.length) {
+          and.push(leaves.length === 1 ? leaves[0] : { or: leaves });
+        }
+      }
+    } else if (propType === 'checkbox') {
+      const b = typeof rawVal === 'boolean' ? rawVal : String(rawVal).toLowerCase() === 'true' || rawVal === '1';
+      and.push({ property: propName, checkbox: { equals: b } });
+    } else if (propType === 'number') {
+      if (typeof rawVal === 'object' && rawVal !== null) {
+        // e.g. { greater_than_or_equal_to: 5 }
+        and.push({ property: propName, number: rawVal });
+      } else {
+        const str = String(rawVal).trim();
+        const num = Number(str.replace(/^[<>=!]+/, ''));
+        if (!isNaN(num)) {
+          if (str.startsWith('>=')) and.push({ property: propName, number: { greater_than_or_equal_to: num } });
+          else if (str.startsWith('<=')) and.push({ property: propName, number: { less_than_or_equal_to: num } });
+          else if (str.startsWith('>')) and.push({ property: propName, number: { greater_than: num } });
+          else if (str.startsWith('<')) and.push({ property: propName, number: { less_than: num } });
+          else if (str.startsWith('!=')) and.push({ property: propName, number: { does_not_equal: num } });
+          else and.push({ property: propName, number: { equals: num } });
+        }
+      }
+    } else if (propType === 'date') {
+      if (typeof rawVal === 'object' && rawVal !== null) {
+        and.push({ property: propName, date: rawVal });
+      } else {
+        const str = String(rawVal).trim();
+        if (str.toLowerCase() === 'none' || str.toLowerCase() === 'empty') {
+          and.push({ property: propName, date: { is_empty: true } });
+        } else if (str.startsWith('>=')) {
+          and.push({ property: propName, date: { on_or_after: str.slice(2).trim() } });
+        } else if (str.startsWith('<=')) {
+          and.push({ property: propName, date: { on_or_before: str.slice(2).trim() } });
+        } else if (str.startsWith('>')) {
+          and.push({ property: propName, date: { after: str.slice(1).trim() } });
+        } else if (str.startsWith('<')) {
+          and.push({ property: propName, date: { before: str.slice(1).trim() } });
+        } else {
+          and.push({ property: propName, date: { equals: str } });
+        }
+      }
+    } else if (propType === 'rich_text' || propType === 'title') {
+      const str = String(rawVal).trim();
+      if (str.toLowerCase() === 'none' || str.toLowerCase() === 'empty') {
+        and.push({ property: propName, [propType]: { is_empty: true } });
+      } else {
+        and.push({ property: propName, [propType]: { contains: str } });
+      }
+    }
   }
 
   const filter = and.length === 0 ? undefined : and.length === 1 ? and[0] : { and };
-  return { filter, resolved, directory };
+  return { filter, resolved, schema, databaseId: resolvedDbId };
 }
 
 /**
- * The filter Notion *would* run for the text part, if page bodies were
- * filterable. Returned for transparency/debugging; the body field has no
- * Notion equivalent and is matched in-process instead.
+ * Equivalent Notion filter representation for text search.
  */
-function equivalentTextFilter(fields, q, directory) {
+function equivalentTextFilter(fields, q, schema) {
   const leaves = [];
   for (const f of fields) {
-    if (f.type === 'title') leaves.push({ property: f.property, title: { contains: q } });
-    else if (f.type === 'rich_text') leaves.push({ property: f.property, rich_text: { contains: q } });
-    else if (f.type === 'people') {
-      resolveValues(q, directory.assignees).forEach((id) => leaves.push({ property: f.property, people: { contains: id } }));
-    } else if (f.type === 'relation') {
-      resolveValues(q, directory.sprints).forEach((id) => leaves.push({ property: f.property, relation: { contains: id } }));
+    if (f.notion_type === 'title') leaves.push({ property: f.notion_property, title: { contains: q } });
+    else if (f.notion_type === 'rich_text') leaves.push({ property: f.notion_property, rich_text: { contains: q } });
+    else if (f.notion_type === 'people') {
+      const users = schema.people_by_property[f.notion_property] || [];
+      resolveValues(q, users).forEach((id) =>
+        leaves.push({ property: f.notion_property, people: { contains: id } }),
+      );
+    } else if (f.notion_type === 'relation') {
+      const targets = schema.relations_by_property[f.notion_property] || [];
+      resolveValues(q, targets).forEach((id) =>
+        leaves.push({ property: f.notion_property, relation: { contains: id } }),
+      );
     }
   }
   return leaves;
 }
 
-async function fetchCandidates(filter) {
+async function fetchCandidates(databaseId, filter) {
   const rows = [];
   let cursor;
   for (let i = 0; i < MAX_CANDIDATE_PAGES; i++) {
-    const body = { page_size: 100, sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }] };
+    const body = { page_size: 100 };
     if (filter) body.filter = filter;
     if (cursor) body.start_cursor = cursor;
-    const res = await queryDatabase(DATABASE_ID, body);
-    rows.push(...res.results);
-    if (!res.has_more) return { rows, truncated: false };
-    cursor = res.next_cursor;
+    try {
+      const res = await queryDatabase(databaseId, body);
+      rows.push(...(res.results || []));
+      if (!res.has_more) return { rows, truncated: false };
+      cursor = res.next_cursor;
+    } catch (err) {
+      if (rows.length > 0) return { rows, truncated: true };
+      throw err;
+    }
   }
   return { rows, truncated: true };
 }
 
-function shape(page, directory, body, comments) {
-  const p = page.properties;
-  const get = (name) => readProperty(p[name]);
-  const sprintIds = get('Sprint') || [];
+/**
+ * Dynamically shape any database page according to its schema.
+ */
+function shapeGeneric(page, schema, body, comments) {
+  const p = page.properties || {};
+  const shapedProps = {};
+  let titleVal = 'Untitled';
+
+  for (const prop of schema.properties) {
+    const name = prop.name;
+    const rawProp = p[name];
+    const val = readProperty(rawProp);
+
+    if (prop.type === 'title') {
+      titleVal = val || 'Untitled';
+      shapedProps[name] = val;
+    } else if (prop.type === 'relation') {
+      const targets = schema.relations_by_property[name] || [];
+      const relIds = Array.isArray(val) ? val : [];
+      shapedProps[name] = relIds.map((id) => {
+        const found = targets.find((t) => t.id === id);
+        return {
+          id,
+          label: found?.label || found?.title || `Page (${id.slice(0, 8)}…)`,
+        };
+      });
+    } else if (prop.type === 'people') {
+      const users = schema.people_by_property[name] || [];
+      const peopleList = Array.isArray(val) ? val : [];
+      shapedProps[name] = peopleList.map((u) => {
+        const found = users.find((x) => x.id === u.id);
+        return {
+          id: u.id,
+          label: found?.label || u.name || u.email || `User (${u.id.slice(0, 8)}…)`,
+          name: u.name,
+          email: u.email,
+          avatar_url: u.avatar_url,
+        };
+      });
+    } else {
+      shapedProps[name] = val;
+    }
+  }
+
+  // Find assignees and relations for quick UI compatibility
+  const firstPeople = schema.properties.find((p) => p.type === 'people')?.name;
+  const firstRelation = schema.properties.find((p) => p.type === 'relation')?.name;
+  const firstStatus = schema.properties.find((p) => p.type === 'status')?.name;
+  const firstSelect = schema.properties.find((p) => p.type === 'select')?.name;
+
   return {
     id: page.id,
     url: page.url,
-    task_id: get('Task ID'),
-    task_name: get('Task Name'),
-    summary: get('Summary'),
-    description: get('Description'),
-    dependencies: get('Dependencies'),
-    story_id: get('Story ID'),
-    source_team: get('Source Team'),
-    source_type: get('Source Type'),
-    assignees: (get('Assignees') || []).map((u) => ({
-      id: u.id,
-      label: directory.assignees.find((a) => a.id === u.id)?.label || u.name || u.id,
-      email: u.email,
-    })),
-    sprint: sprintIds.map((id) => ({ id, label: directory.sprints.find((s) => s.id === id)?.label || id })),
-    status: get('Status'),
-    priority: get('Priority'),
-    project: get('Project'),
-    team: get('Team'),
-    category: get('Category'),
-    story_points: get('Story Points'),
-    due_date: get('Due Date'),
+    title: titleVal,
+    task_name: titleVal, // backwards compatibility
+    properties: shapedProps,
+    // Convenience fields for UI
+    assignees: firstPeople ? shapedProps[firstPeople] || [] : [],
+    relation_targets: firstRelation ? shapedProps[firstRelation] || [] : [],
+    status: firstStatus ? shapedProps[firstStatus]?.name ?? shapedProps[firstStatus] : null,
+    priority: firstSelect ? shapedProps[firstSelect]?.name ?? shapedProps[firstSelect] : null,
+    created_time: page.created_time,
     last_edited_time: page.last_edited_time,
     page_content: body || null,
-    comments: (comments || []).map((c) => ({
-      ...c,
-      author: directory.assignees.find((a) => a.id === c.author_id)?.label
-        || (c.author_id ? `User ${c.author_id.slice(0, 8)}…` : null),
-    })),
+    comments: (comments || []).map((c) => {
+      let authorLabel = null;
+      if (c.author_id) {
+        for (const userList of Object.values(schema.people_by_property)) {
+          const found = userList.find((u) => u.id === c.author_id);
+          if (found) { authorLabel = found.label; break; }
+        }
+        if (!authorLabel) authorLabel = `User ${c.author_id.slice(0, 8)}…`;
+      }
+      return {
+        ...c,
+        author: authorLabel,
+      };
+    }),
   };
 }
 
-/** Which of the active fields contain `q` on this row. */
-function matchFields(row, q, fields, directory) {
+/**
+ * Test which fields match free text term `q`.
+ */
+function matchFieldsGeneric(row, q, activeTextFields, schema) {
   const t = q.toLowerCase();
   const hit = (v) => typeof v === 'string' && v.toLowerCase().includes(t);
-  const userIds = resolveValues(q, directory.assignees);
-  const sprintIds = resolveValues(q, directory.sprints);
   const out = [];
-  for (const f of fields) {
-    switch (f.key) {
-      case 'assignee':
-        if (row.assignees.some((a) => userIds.includes(a.id))) out.push(f.key);
-        break;
-      case 'sprint':
-        if (row.sprint.some((s) => sprintIds.includes(s.id))) out.push(f.key);
-        break;
-      case 'page_content':
-        if (hit(row.page_content)) out.push(f.key);
-        break;
-      case 'comment':
-        if (row.comments.some((c) => hit(c.text))) out.push(f.key);
-        break;
-      default:
-        if (hit(row[f.key])) out.push(f.key);
+
+  for (const f of activeTextFields) {
+    if (f.key === 'page_content') {
+      if (hit(row.page_content)) out.push('page_content');
+    } else if (f.key === 'comment') {
+      if (row.comments.some((c) => hit(c.text))) out.push('comment');
+    } else if (f.notion_type === 'people') {
+      const users = schema.people_by_property[f.notion_property] || [];
+      const userIds = resolveValues(q, users);
+      const rowUsers = row.properties[f.notion_property] || [];
+      if (rowUsers.some((u) => userIds.includes(u.id) || hit(u.label) || hit(u.name) || hit(u.email))) {
+        out.push(f.key);
+      }
+    } else if (f.notion_type === 'relation') {
+      const targets = schema.relations_by_property[f.notion_property] || [];
+      const targetIds = resolveValues(q, targets);
+      const rowRelations = row.properties[f.notion_property] || [];
+      if (rowRelations.some((r) => targetIds.includes(r.id) || hit(r.label) || hit(r.title))) {
+        out.push(f.key);
+      }
+    } else {
+      const val = row.properties[f.notion_property];
+      if (hit(val)) {
+        out.push(f.key);
+      }
     }
   }
+
   return out;
 }
 
-export async function search(params) {
-  const built = await buildQuery(params);
+export async function search(params = {}) {
+  const rawDb = params.database_id || params.database;
+  const built = await buildQuery(rawDb, params);
   if (built.error) {
-    return { results: [], count: 0, total: 0, offset: 0, has_more: false, next_cursor: null,
-             notice: built.error, notion_filter: null, text_matching: null };
+    return {
+      results: [],
+      count: 0,
+      total: 0,
+      offset: 0,
+      has_more: false,
+      next_cursor: null,
+      notice: built.error,
+      notion_filter: null,
+      text_matching: null,
+    };
   }
 
-  const { filter, resolved, directory } = built;
+  const { filter, resolved, schema, databaseId } = built;
   const q = String(params.q ?? '').trim();
-  const keys = asArray(params.fields).filter((k) => FIELD_BY_KEY[k]);
-  const fields = (keys.length ? keys : DEFAULT_FIELD_KEYS).map((k) => FIELD_BY_KEY[k]);
-  const wantsBody = fields.some((f) => f.key === 'page_content');
-  const wantsComments = fields.some((f) => f.key === 'comment');
+
+  // Discover all text-capable fields for this database
+  const allTextFields = [];
+  for (const p of schema.properties) {
+    if (p.type === 'title' || p.type === 'rich_text' || p.type === 'people' || p.type === 'relation') {
+      allTextFields.push({
+        key: slugify(p.name),
+        label: p.name,
+        notion_property: p.name,
+        notion_type: p.type,
+      });
+    }
+  }
+  allTextFields.push(
+    { key: 'page_content', label: 'Page Content', notion_property: null, notion_type: 'page_content' },
+    { key: 'comment', label: 'Comments', notion_property: null, notion_type: 'comments' },
+  );
+
+  const reqFieldKeys = asArray(params.fields).map(slugify);
+  const activeFields = reqFieldKeys.length > 0
+    ? allTextFields.filter((f) => reqFieldKeys.includes(f.key))
+    : allTextFields;
+
+  const wantsBody = activeFields.some((f) => f.key === 'page_content');
+  const wantsComments = activeFields.some((f) => f.key === 'comment');
 
   const pageSize = Math.min(Math.max(Number(params.page_size) || 25, 1), 100);
   const offset = Math.max(Number(params.offset ?? params.start_cursor) || 0, 0);
 
   const [{ rows, truncated }, content] = await Promise.all([
-    fetchCandidates(filter),
-    q && (wantsBody || wantsComments) ? getContentIndex() : Promise.resolve(null),
+    fetchCandidates(databaseId, filter),
+    q && (wantsBody || wantsComments) ? getContentIndex(databaseId) : Promise.resolve(null),
   ]);
 
   let shaped = rows.map((p) =>
-    shape(p, directory, content?.textById.get(p.id) ?? null, content?.commentsById.get(p.id) ?? []));
+    shapeGeneric(
+      p,
+      schema,
+      content?.textById?.get(p.id) ?? null,
+      content?.commentsById?.get(p.id) ?? [],
+    ),
+  );
 
   let textMatching = null;
   if (q) {
     shaped = shaped
-      .map((r) => ({ ...r, matched_fields: matchFields(r, q, fields, directory) }))
+      .map((r) => ({ ...r, matched_fields: matchFieldsGeneric(r, q, activeFields, schema) }))
       .filter((r) => r.matched_fields.length > 0);
 
     textMatching = {
       term: q,
-      fields: fields.map((f) => f.key),
-      notion_filter_equivalent: equivalentTextFilter(fields, q, directory),
+      fields: activeFields.map((f) => f.key),
+      notion_filter_equivalent: equivalentTextFilter(activeFields, q, schema),
       page_content: wantsBody
-        ? { matched_in_process: true,
+        ? {
+            matched_in_process: true,
             reason: 'Notion database filters cannot read page body text.',
             pages_indexed: content?.pages_indexed ?? 0,
-            indexed_at: content?.built_at ?? null }
+            indexed_at: content?.built_at ?? null,
+          }
         : null,
       comment: wantsComments
-        ? { matched_in_process: true,
+        ? {
+            matched_in_process: true,
             reason: 'Notion database filters cannot read comments.',
             comments_indexed: content?.comments_indexed ?? 0,
             pages_with_comments: content?.pages_with_comments ?? 0,
             inline_comments_indexed: content?.inline_comments_indexed ?? false,
-            caveat: 'Notion\'s API returns unresolved comments only; resolved threads cannot be read.',
-            indexed_at: content?.built_at ?? null }
+            caveat: "Notion's API returns unresolved comments only; resolved threads cannot be read.",
+            indexed_at: content?.built_at ?? null,
+          }
         : null,
     };
   } else {
@@ -220,7 +447,6 @@ export async function search(params) {
     page_content: q ? snippet(r.page_content, q) : null,
     page_content_chars: r.page_content ? r.page_content.length : 0,
     comment_count: r.comments.length,
-    // Return only the threads that matched, not every comment on the page.
     comments: q
       ? r.comments
           .filter((c) => c.text.toLowerCase().includes(q.toLowerCase()))
@@ -229,6 +455,12 @@ export async function search(params) {
   }));
 
   return {
+    database: {
+      id: schema.database.id,
+      title: schema.database.title,
+      icon: schema.database.icon,
+      url: schema.database.url,
+    },
     results: slice,
     count: slice.length,
     total,

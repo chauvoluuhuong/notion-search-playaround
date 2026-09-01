@@ -1,35 +1,59 @@
 import express from 'express';
 import path from 'node:path';
 import { PORT } from './src/config.js';
-import { search } from './src/search.js';
+import { listDatabases, resolveDatabaseId } from './src/databases.js';
+import { getDatabaseSchema } from './src/directory.js';
 import { filterInstructions } from './src/filters.js';
-import { getDirectory } from './src/directory.js';
+import { search } from './src/search.js';
 import { NotionError } from './src/notion.js';
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.resolve(process.cwd(), 'public')));
 
-const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
-  const status = err instanceof NotionError ? err.status : 500;
-  console.error(err);
-  res.status(status).json({ error: err.message, code: err.code ?? 'internal_error' });
-});
+const wrap = (fn) => (req, res) =>
+  fn(req, res).catch((err) => {
+    const status = err instanceof NotionError ? err.status : 500;
+    console.error(err);
+    res.status(status).json({ error: err.message, code: err.code ?? 'internal_error' });
+  });
+
+/** Discover and list all Notion databases in the workspace. */
+app.get('/api/databases', wrap(async (req, res) => {
+  const databases = await listDatabases({ refresh: req.query.refresh === '1' });
+  res.json({ databases, count: databases.length });
+}));
+
+/** Full schema & filter instructions for a specific database. */
+app.get('/api/databases/:id', wrap(async (req, res) => {
+  const databaseId = req.params.id;
+  const instructions = await filterInstructions({
+    databaseId,
+    refresh: req.query.refresh === '1',
+  });
+  res.json(instructions);
+}));
 
 /** Filter capability document: what can be filtered and with which values. */
 app.get('/api/filters', wrap(async (req, res) => {
-  res.json(await filterInstructions({ refresh: req.query.refresh === '1' }));
+  const databaseId = req.query.database_id || req.query.database;
+  res.json(await filterInstructions({ databaseId, refresh: req.query.refresh === '1' }));
 }));
 app.get('/api/filter-instructions', (req, res) => res.redirect(307, '/api/filters'));
 
-/** Just the value lists, for populating dropdowns. */
+/** Value lists & options for populating dynamic dropdowns. */
 app.get('/api/options', wrap(async (req, res) => {
-  const dir = await getDirectory({ refresh: req.query.refresh === '1' });
+  const databaseId = await resolveDatabaseId(req.query.database_id || req.query.database, {
+    refresh: req.query.refresh === '1',
+  });
+  const schema = await getDatabaseSchema(databaseId, { refresh: req.query.refresh === '1' });
+
   res.json({
-    assignees: dir.assignees.map(({ id, label, email, count }) => ({ id, label, email, count })),
-    sprints: dir.sprints.map(({ id, label, status, count }) => ({ id, label, status, count })),
-    statuses: dir.statuses,
-    priorities: dir.priorities,
+    database: schema.database,
+    properties: schema.properties,
+    options_by_property: schema.options_by_property,
+    people_by_property: schema.people_by_property,
+    relations_by_property: schema.relations_by_property,
   });
 }));
 
@@ -40,7 +64,8 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.listen(PORT, () => {
   console.log(`notion-search  →  http://localhost:${PORT}`);
-  console.log(`  form          http://localhost:${PORT}/`);
-  console.log(`  search API    http://localhost:${PORT}/api/search?q=supplier`);
-  console.log(`  filter API    http://localhost:${PORT}/api/filters`);
+  console.log(`  UI               http://localhost:${PORT}/`);
+  console.log(`  databases API    http://localhost:${PORT}/api/databases`);
+  console.log(`  search API       http://localhost:${PORT}/api/search`);
+  console.log(`  filter API       http://localhost:${PORT}/api/filters`);
 });

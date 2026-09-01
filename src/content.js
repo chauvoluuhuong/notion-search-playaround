@@ -1,12 +1,13 @@
-import { DATABASE_ID, INDEX_INLINE_COMMENTS } from './config.js';
+import { INDEX_INLINE_COMMENTS } from './config.js';
 import { getBlockChildren, getComments, queryDatabase } from './notion.js';
+import { dashedUuid } from './databases.js';
 
 const TTL_MS = 5 * 60 * 1000;
 const CONCURRENCY = 8;
 const MAX_PAGES = 1000;
 
-let cache = null;
-let inFlight = null;
+const contentCaches = new Map();
+const inFlightMap = new Map();
 
 /** Flatten every rich_text / caption run inside one block. */
 function blockText(block) {
@@ -50,11 +51,7 @@ async function pageBody(pageId) {
 
 /**
  * Comment threads on a page.
- *
- * Notion's comments endpoint returns only UNRESOLVED comments — once a thread
- * is resolved in the UI it disappears from the API, so it cannot be indexed.
- * Page-level comments are always fetched; inline (block-level) ones cost one
- * request per block, so they are behind INDEX_INLINE_COMMENTS.
+ * Notion's comments endpoint returns only UNRESOLVED comments.
  */
 async function pageComments(pageId, blockIds) {
   const targets = [pageId, ...(INDEX_INLINE_COMMENTS ? blockIds : [])];
@@ -83,7 +80,7 @@ async function pageComments(pageId, blockIds) {
         cursor = res.has_more ? res.next_cursor : undefined;
       } while (cursor);
     } catch {
-      // No "read comments" capability, or the target is not readable.
+      // No "read comments" capability, or target is not readable.
     }
   }
   out.sort((a, b) => String(a.created_time).localeCompare(String(b.created_time)));
@@ -105,17 +102,20 @@ async function pool(items, worker, size = CONCURRENCY) {
 }
 
 /**
- * Notion database filters can only see *properties*. Body text of each task
- * page is invisible to them, so it is indexed here and matched in-process.
+ * Index page body text and comments for a given database.
  */
-async function build() {
+async function buildContent(databaseId) {
   const rows = [];
   let cursor;
   while (rows.length < MAX_PAGES) {
-    const page = await queryDatabase(DATABASE_ID, { page_size: 100, start_cursor: cursor });
-    rows.push(...page.results);
-    if (!page.has_more) break;
-    cursor = page.next_cursor;
+    try {
+      const page = await queryDatabase(databaseId, { page_size: 100, start_cursor: cursor });
+      rows.push(...(page.results || []));
+      if (!page.has_more) break;
+      cursor = page.next_cursor;
+    } catch {
+      break;
+    }
   }
 
   const built = await pool(rows, async (p) => {
@@ -146,22 +146,50 @@ async function build() {
   };
 }
 
+let defaultSyntheticIndex = null;
+
 /**
- * Seed the cache directly. Used to warm the index at boot, and by tests to
- * exercise matching without depending on live workspace content.
+ * Seed synthetic index. If databaseId is passed as an object, it sets defaultSyntheticIndex for test compatibility.
  */
-export function primeIndex(value) {
-  cache = { at: Date.now(), value };
-  return value;
+export function primeIndex(databaseIdOrValue, maybeValue) {
+  if (typeof databaseIdOrValue === 'object' && databaseIdOrValue !== null && !maybeValue) {
+    defaultSyntheticIndex = databaseIdOrValue;
+    return defaultSyntheticIndex;
+  }
+  const normId = dashedUuid(databaseIdOrValue).toLowerCase();
+  contentCaches.set(normId, { at: Date.now(), value: maybeValue });
+  return maybeValue;
 }
 
-export async function getContentIndex({ refresh = false } = {}) {
-  if (!refresh && cache && Date.now() - cache.at < TTL_MS) return cache.value;
-  if (inFlight) return inFlight;
-  inFlight = build()
-    .then((value) => { cache = { at: Date.now(), value }; return value; })
-    .finally(() => { inFlight = null; });
-  return inFlight;
+export async function getContentIndex(databaseId, { refresh = false } = {}) {
+  if (defaultSyntheticIndex) {
+    return defaultSyntheticIndex;
+  }
+  if (!databaseId) {
+    const { resolveDatabaseId } = await import('./databases.js');
+    databaseId = await resolveDatabaseId();
+  }
+  const normId = dashedUuid(databaseId).toLowerCase();
+
+  const cached = contentCaches.get(normId);
+  if (!refresh && cached && Date.now() - cached.at < TTL_MS) {
+    return cached.value;
+  }
+  if (inFlightMap.has(normId)) {
+    return inFlightMap.get(normId);
+  }
+
+  const promise = buildContent(normId)
+    .then((value) => {
+      contentCaches.set(normId, { at: Date.now(), value });
+      return value;
+    })
+    .finally(() => {
+      inFlightMap.delete(normId);
+    });
+
+  inFlightMap.set(normId, promise);
+  return promise;
 }
 
 /** A short excerpt around the first match, for the results list. */

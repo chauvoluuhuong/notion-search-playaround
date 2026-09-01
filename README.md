@@ -1,9 +1,11 @@
 # notion-search
 
-Search form + filter API over the Notion database
-**🛠️ Engineering Issue Tracker** (`f30ea2c04eb3824082c081891bee91a1`), including the
-body text and comments of each task page — neither of which Notion's own database
-filters can reach.
+A universal, generic search and dynamic filtering engine for any Notion database in your workspace.
+
+Automatically discovers:
+1. **All databases** shared with the integration (`POST /v1/search`).
+2. **Schema & filter capabilities** for any database (discovers properties, types, select/multi-select/status options, workspace people, relations with automatic target page title resolution, dates, numbers, checkboxes, and text).
+3. **In-process page body and comment indexing** for text search over content Notion's native database filters cannot reach.
 
 ```bash
 npm install
@@ -12,322 +14,121 @@ npm start        # http://localhost:3100
 
 | What | Where |
 |---|---|
-| Search form | http://localhost:3100/ |
-| Search API | `GET /api/search` |
-| Filter capability / instruction API | `GET /api/filters` |
-| Dropdown values only | `GET /api/options` |
+| Web Interface | http://localhost:3100/ |
+| Database Discovery | `GET /api/databases` |
+| Filter Capability & Schema API | `GET /api/filters?database_id=<id>` |
+| Dropdown & Option Values | `GET /api/options?database_id=<id>` |
+| Universal Search & Filter API | `GET /api/search` / `POST /api/search` |
 
-Credentials live in `.env` (git-ignored). Port is 3100 because 3000 was already
-taken on this machine.
+---
 
-### Testing the API
+## 1. Database Discovery (`GET /api/databases`)
 
-**Postman:** import [`postman_collection.json`](postman_collection.json)
-(*Import → File*). 48 requests in 8 folders, every one a read — safe to run with
-the Collection Runner.
+Discovers all databases accessible to your Notion integration token:
 
-Set the `baseUrl` variable if you are not on `http://localhost:3100`, then run
-**01 · Health & metadata → Filter instructions** first: its test script captures
-`{{assigneeId}}`, `{{assigneeName}}`, `{{assigneeEmail}}`, `{{sprintId}}` and
-`{{sprintName}}`, which the *by id* and *by email* requests use.
+```json
+{
+  "databases": [
+    {
+      "id": "bdaec82f-2142-4cf9-a017-ba7b47678e6c",
+      "title": "IT Epics",
+      "icon": { "type": "emoji", "emoji": "🗂️" },
+      "properties_count": 6,
+      "property_names": ["Owner", "Goal", "Status", "Start", "Target end", "Epic"],
+      "url": "https://app.notion.com/p/bdaec82f21424cf9a017ba7b47678e6c"
+    },
+    {
+      "id": "9d483ce4-2747-4ea3-a741-bc9a2bc98c4e",
+      "title": "IT User Stories",
+      "icon": { "type": "emoji", "emoji": "🧩" },
+      "properties_count": 11,
+      "property_names": ["Priority", "Sprint", "Due", "Status", "Epic", "Created", "Description", "Assignee", "Last edited", "Estimate (pts)", "Story"],
+      "url": "https://app.notion.com/p/9d483ce427474ea3a741bc9a2bc98c4e"
+    }
+  ],
+  "count": 2
+}
+```
 
-| Folder | Covers |
-|---|---|
-| 01 · Health & metadata | health, options, the filter instruction API, cache refresh |
-| 02 · Text search | free text, field-limited text, page-body-only text, comments-only, body+comments, opt-in fields, case-insensitivity, no-match |
-| 03 · Assignee filter | by name, id, email, `none`, OR of two, unknown value |
-| 04 · Sprint filter | by name, page id, OR of two, `none`, unknown value |
-| 05 · Status, priority & combined | single, OR, AND across parameters |
-| 06 · Pagination | cursor chaining, max page size, clamping |
-| 07 · POST | JSON body, arrays, empty body |
-| 08 · Edge cases | unknown field keys, empty `q`, 404 |
+Force a cache refresh: `GET /api/databases?refresh=1`.
 
-Two requests in *02* are deliberately paired: `q=not-found response` returns 1
-result, and the same term with `page_content` disabled returns 0 — a live
-demonstration of what Notion's own filters cannot reach.
+---
 
-**Plain curl:** [`curl-examples.sh`](curl-examples.sh) has the same 48 calls as
-copy-pasteable commands with real ids filled in. Postman's *Import → Raw text*
-takes one cURL command at a time, so use the collection for the whole suite.
+## 2. Schema Discovery & Filter Capabilities (`GET /api/filters`)
 
-### Unit tests
+Given any database ID or title, returns a self-describing capability document with:
+- All properties and their Notion types (`select`, `multi_select`, `status`, `people`, `relation`, `number`, `date`, `checkbox`, `rich_text`, `title`, etc.)
+- Supported filter operators for each field
+- Allowed values, counts, and Notion colors
+- Automatically resolved target page titles for relations
+- Searchable text fields including page body and unresolved comments
+
+```bash
+curl "http://localhost:3100/api/filters?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e"
+```
+
+---
+
+## 3. Universal Search & Filtering (`GET /api/search` and `POST /api/search`)
+
+Filter any field on any database dynamically:
+
+### By Select / Status / Multi-select
+```bash
+# Filter by Priority
+curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&Priority=P0"
+
+# Multiple options (OR)
+curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&Priority=P0,P1"
+
+# Filter by Status
+curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&Status=In%20progress"
+```
+
+### By Relation (Auto Title Resolution)
+Pass the human title of the related page; the engine automatically resolves it to the page UUID:
+```bash
+curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&Epic=Identity%20%26%20access%20cleanup"
+```
+
+### Free Text Search (`q`) Across Properties, Page Body & Comments
+```bash
+curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&q=automated%20checklist"
+```
+
+### POST JSON API
+```bash
+curl -X POST "http://localhost:3100/api/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "database_id": "9d483ce4-2747-4ea3-a741-bc9a2bc98c4e",
+    "Priority": ["P0", "P1"],
+    "Sprint": "Sprint 1",
+    "q": "access"
+  }'
+```
+
+---
+
+## 4. Web UI Features
+
+- **Database Switcher:** Dropdown in the header to switch between any discovered database on the fly.
+- **Dynamic Filter Controls:** Form inputs automatically generate according to the selected database's schema (Select / Multi-select / Status with Notion colors and counts, People user pickers, Relation target pickers, Number comparisons, Date selectors, and Checkboxes).
+- **Active Filter Chips:** Shows active filters with individual `×` removal and a "Clear all" button.
+- **Dynamic Result Cards:** Displays all properties of each result with Notion colors, people avatars, relation links, page body excerpts, and comment threads.
+- **Query Inspector:** Collapsible debugger displaying the generated Notion API filter and text search metadata.
+
+---
+
+## 5. Running Tests
 
 ```bash
 npm test
 ```
 
-Covers comment matching against a synthetic index (`test/comment-search.test.mjs`),
-so the behaviour is verifiable even while the workspace has no comments in it:
-matching, case-insensitivity, inline comments, excerpt/author shaping, the
-`comment_count` vs returned-threads distinction, and that comment text never
-leaks into results when `q` is empty.
-
-### Using the form
-
-- **Every match is shown**, not a first page — the form keeps requesting pages
-  until the result set is exhausted, and the count reads e.g. *"45 results — all
-  shown"*. Past 500 rows it stops and offers a button for the rest, so a huge
-  filter cannot lock up the browser.
-- **Filters clear at three levels**: the `×` on any chip in the *Filtering by*
-  bar removes that one value, the **clear** link above a column empties that
-  column, and **Clear all filters** resets everything including the search box
-  and the field selection.
-- Changing any filter re-runs the search immediately; a superseded request is
-  discarded, so fast clicking cannot interleave stale results.
-
----
-
-## Field names — corrections
-
-You asked for *assignee, description, summary, command, sprint*. Here is what the
-table actually has:
-
-| You said | Actual Notion property | Type | Note |
-|---|---|---|---|
-| assignee | **`Assignees`** | `people` | There are also unused `Assign`, `Assign QC`, `CS Owner`, `QC Owner` people columns — all empty on all 81 rows, so only `Assignees` is wired up. |
-| description | **`Description`** | `rich_text` | ✅ exact match |
-| summary | **`Summary`** | `rich_text` | ✅ exact match |
-| **command** | **— does not exist —** | | No `Command` (or `Comment`) property exists, and the pages carry no Notion comments either. See below. |
-| sprint | **`Sprint`** | `relation` → Sprint DB | Not a text column; it points at a separate Sprint table. |
-
-**About "command":** there is no such column. Rather than guess, the search
-covers *every* remaining text-bearing column, so whatever you meant is included:
-`Task Name` (title), `Dependencies`, `Story ID`, and optionally `Source Team` and
-`Source Type`. If "command" is a column you are about to add, add one line to
-`SEARCH_FIELDS` in [src/config.js](src/config.js) and it appears in both the API
-and the form automatically.
-
----
-
-## Page body text (`page_content`)
-
-**A Notion database query can only ever see properties — never the body of a
-page.** Most of the real detail in this table (acceptance criteria, API
-behaviour, edge cases) lives in the page body, so a property-only search misses
-it. Example: `"not-found response"` appears in exactly one task, #4
-*STORY-03.07*, inside the page body — no Notion filter can find it, and Notion's
-own `/v1/search` endpoint does not match it either.
-
-So the server indexes the body of every task page (`src/content.js`, one pass
-over the block tree, 5-minute cache) and matches that text in-process. The
-`page_content` field is on by default; matched rows come back with a highlighted
-excerpt and a `match: page_content` chip.
-
-Currently 73 of the 81 pages have body text (~36k characters), so the whole index
-is trivial to hold in memory. The first search after a cold start pays ~10s to
-build it (page bodies plus one comments call per page); subsequent searches are
-~1s.
-
-Every response says exactly how the text was matched:
-
-```jsonc
-"text_matching": {
-  "term": "not-found response",
-  "fields": ["assignee", "description", "summary", "sprint", "task_name", "dependencies", "story_id", "page_content"],
-  "notion_filter_equivalent": [ /* what Notion itself evaluates */ ],
-  "page_content": {
-    "matched_in_process": true,
-    "reason": "Notion database filters cannot read page body text.",
-    "pages_indexed": 81
-  }
-}
-```
-
-Drop `page_content` from `fields` to get pure Notion-side behaviour.
-
----
-
-## Comments (`comment`)
-
-Comments are not a property either, so the same approach applies: they are read
-via `GET /v1/comments` during the index pass and matched in-process. The
-`comment` field is on by default.
-
-A matching row returns **only the threads that hit**, each with an excerpt,
-resolved author and timestamp, alongside `comment_count` for the page total:
-
-```jsonc
-{
-  "task_id": "4",
-  "comment_count": 2,
-  "comments": [{
-    "text": "Blocked on the payment gateway sandbox credentials — pinged infra.",
-    "excerpt": "…payment gateway sandbox credentials…",
-    "author": "Lucas Luu",
-    "created_time": "2026-08-01T10:00:00.000Z",
-    "inline": false
-  }],
-  "matched_fields": ["comment"]
-}
-```
-
-### Two limitations worth knowing
-
-**Notion only exposes unresolved comments.** Once a thread is resolved in the
-UI it is no longer returned by the API, so it cannot be indexed and cannot be
-searched. There is no API-side workaround. `/api/filters` states this under
-`text_search.comment_search.limitation`.
-
-**Inline comments are opt-in.** A comment anchored to the page shows up on the
-page itself, but one anchored to a block inside the page needs a separate
-request *per block* — roughly 5–10× the API calls. Page-level comments are
-always indexed; set `INDEX_INLINE_COMMENTS=1` to include block-level ones.
-
-### The workspace currently has no comments
-
-At the time of writing this table has **zero** unresolved comments — none at
-page level across all 81 pages, and none inline across a sampled 104 blocks. So
-a comment search legitimately returns nothing today. Confirm with:
-
-```bash
-curl -s "http://localhost:3100/api/search?q=anything&fields=comment" \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)['text_matching']['comment'])"
-```
-
-If `comments_indexed` is 0, there is nothing to find rather than something
-broken. Add a comment in Notion, wait out the 5-minute cache (or call
-`/api/options?refresh=1`), and it becomes searchable.
-
----
-
-## The two Notion quirks this handles
-
-Notion's query API **cannot do a text `contains` on a `people` or a `relation`
-column** — those only filter by UUID. So a plain text search over "assignee" and
-"sprint" is impossible in one call.
-
-The server works around it in two steps:
-
-1. Build a directory of every assignee (from `/v1/users` **plus** a scan of the
-   rows, which catches guests the integration cannot read) and every sprint page.
-2. Resolve the search term against those names → concrete ids → then filter with
-   `people.contains: <user_id>` / `relation.contains: <page_id>`.
-
-The directory is cached for 5 minutes; `?refresh=1` rebuilds it.
-
----
-
-## `GET /api/search`
-
-All parameters optional. Values inside one parameter are **OR**-ed; different
-parameters are **AND**-ed.
-
-| Param | Meaning |
-|---|---|
-| `q` | Free text, case-insensitive `contains`, across all default fields |
-| `fields` | Restrict which fields `q` searches, e.g. `summary,description`. Include `page_content` to search page bodies |
-| `assignee` | User id, partial name, email, or `none` (unassigned). Repeatable/comma-separated |
-| `sprint` | Sprint page id, partial name, or `none` (no sprint) |
-| `status` | Exact status name, e.g. `Dev Completed` |
-| `priority` | Exact priority name, e.g. `P0 - Critical` |
-| `page_size` | 1–100, default 25 |
-| `start_cursor` / `offset` | `next_cursor` from the previous response (a row offset) |
-
-`POST /api/search` accepts the same keys as a JSON body.
-
-```bash
-curl "http://localhost:3100/api/search?q=supplier"
-curl "http://localhost:3100/api/search?assignee=Lucas&sprint=Sprint%201,Sprint%202"
-curl "http://localhost:3100/api/search?q=portal&fields=summary,description"
-curl "http://localhost:3100/api/search?assignee=none&sprint=none"
-```
-
-`total` is a real count, not a page count — the structured filters run on
-Notion's side, then text matching and paging happen over the returned set (capped
-at 1000 rows). Each response echoes the `notion_filter` it built and
-`matched_fields` per row, so you can see *why* a row matched:
-
-```json
-{
-  "results": [{
-    "task_id": "80",
-    "task_name": "[DevOps/Infra] Add Nginx reverse proxy …",
-    "summary": "View and triage incoming purchase orders",
-    "assignees": [{ "id": "330d…", "label": "Lucas Luu" }],
-    "sprint":    [{ "id": "113e…", "label": "Sprint 1" }],
-    "page_content": "…a safe not-found response without creating a product…",
-    "matched_fields": ["description", "page_content"],
-    "url": "https://app.notion.com/p/…"
-  }],
-  "count": 25,
-  "total": 45,
-  "has_more": true,
-  "next_cursor": "25",
-  "notion_filter": { "and": [ … ] },
-  "text_matching": { … }
-}
-```
-
----
-
-## `GET /api/filters` — the filter instruction API
-
-This is the endpoint that tells a caller *how* to filter and *which values are
-allowed*. It is self-describing: for each filterable field it returns the Notion
-property, the operators, the raw filter template, and the complete value list.
-
-```jsonc
-{
-  "how_to_call": { "endpoint": "GET /api/search", "parameters": { … } },
-  "text_search": { "operator": "contains (case-insensitive)", "fields": [ … ] },
-  "filters": [
-    {
-      "field": "assignee",
-      "notion_property": "Assignees",
-      "notion_type": "people",
-      "operators": ["contains (by user id)", "is_empty (pass \"none\")"],
-      "accepts": ["user id (uuid)", "name (partial)", "email", "\"none\""],
-      "notion_filter_template": { "property": "Assignees", "people": { "contains": "<user_id>" } },
-      "values": [
-        { "id": "330d872b-…", "label": "Lucas Luu",  "email": "lucas.luu@innostaas.com", "task_count": 18, "filterable_by_name": true },
-        { "id": "3bad872b-…", "label": "Unnamed member (3bad872b…)", "task_count": 18, "filterable_by_name": false,
-          "note": "Workspace guest the integration cannot read; filter this one by id." },
-        { "id": "32fd872b-…", "label": "Angus Sim", "task_count": 0, "filterable_by_name": true }
-      ]
-    },
-    {
-      "field": "sprint",
-      "notion_property": "Sprint",
-      "notion_type": "relation",
-      "notion_filter_template": { "property": "Sprint", "relation": { "contains": "<sprint_page_id>" } },
-      "values": [
-        { "id": "113ea2c0-…", "label": "Sprint 1", "status": "Active",   "start_date": "2026-05-04", "end_date": "2026-05-15", "task_count": 37 },
-        { "id": "eb8ea2c0-…", "label": "Sprint 2", "status": "Planning", "task_count": 15 }
-        // … Sprint 3–5 and one untitled sprint
-      ]
-    }
-  ],
-  "examples": [ … ]
-}
-```
-
-Heads-up on the values it currently returns:
-
-- One assignee (18 tasks) is a **workspace guest the integration cannot read** —
-  the API returns `name: null` for them. They are still listed and still
-  filterable, but only by id (`filterable_by_name: false`). Inviting that person
-  as a workspace member, or granting the integration user-read access, fixes the
-  label.
-- `Angus Sim` exists in the workspace but is on 0 tasks.
-- The Sprint table has 6 pages; one has an empty title and shows as
-  *"Untitled sprint (5b2ea2c0…)"*.
-- 18 of the 81 tasks have no sprint, and 45 have no assignee — use
-  `sprint=none` / `assignee=none` to find them.
-
----
-
-## Layout
-
-```
-server.js            routes
-src/config.js        env + the field map (edit SEARCH_FIELDS to add a column)
-src/notion.js        Notion REST client + property readers
-src/directory.js     assignee & sprint value discovery, name→id resolution, cache
-src/content.js       page-body + comment index (what Notion cannot filter on)
-src/search.js        Notion filter builder + text matching + result shaping
-src/filters.js       the /api/filters instruction document
-public/index.html    the search form (no build step)
-test/                unit tests for comment matching
-postman_collection.json  importable Postman collection (48 requests)
-curl-examples.sh     the same 48 calls as plain curl commands
-```
+Runs the test suite verifying:
+- Database discovery (`listDatabases`)
+- Schema and filter options discovery
+- Relation target page title resolution
+- Generic search query execution across multiple databases
+- Comment and page body in-process matching

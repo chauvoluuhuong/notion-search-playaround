@@ -3,169 +3,731 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Engineering Issue Tracker — Search</title>
+<title>Notion Generic Database Search & Filter</title>
 <style>
-  :root{
-    --bg:#f7f7f5; --panel:#fff; --ink:#1e1d1a; --muted:#6b6a65; --line:#e3e2dd;
-    --accent:#2563eb; --accent-soft:#e8efff; --mark:#fff2a8; --chip:#f0efec;
-    --radius:10px;
+  :root {
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --panel-sub: #f1f5f9;
+    --ink: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --line-focus: #3b82f6;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-soft: #eff6ff;
+    --accent-border: #bfdbfe;
+    --mark: #fef08a;
+    --chip: #f1f5f9;
+    --chip-hover: #e2e8f0;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  @media (prefers-color-scheme:dark){
-    :root{ --bg:#191918; --panel:#232322; --ink:#eceae5; --muted:#a09e97; --line:#33322f;
-           --accent:#7aa2ff; --accent-soft:#22304d; --mark:#6b5b1e; --chip:#2d2c2a; }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0f17;
+      --panel: #131b2e;
+      --panel-sub: #1e293b;
+      --ink: #f8fafc;
+      --muted: #94a3b8;
+      --line: #24324d;
+      --line-focus: #60a5fa;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-soft: #172554;
+      --accent-border: #1e3a8a;
+      --mark: #713f12;
+      --chip: #1e293b;
+      --chip-hover: #2e3d55;
+    }
   }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-       font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;}
-  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 64px}
-  header h1{font-size:20px;margin:0 0 4px;letter-spacing:-.01em}
-  header p{margin:0 0 20px;color:var(--muted);font-size:13.5px}
-  header a{color:var(--accent)}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
-  .searchrow{display:flex;gap:10px}
-  .searchrow input[type=search]{flex:1;min-width:0;padding:11px 13px;font-size:15px;
-       border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
-  .searchrow input[type=search]:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
-  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
-         background:var(--panel);color:var(--ink);padding:10px 14px}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;padding:11px 22px}
-  button:hover{filter:brightness(1.04)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:16px}
-  label.lbl{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
-            color:var(--muted);font-weight:600;margin-bottom:6px}
-  .lblrow{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-  .lblrow .lbl{margin-bottom:6px}
-  .clearbtn{border:0;background:none;color:var(--accent);padding:0 0 6px;font-size:11.5px;
-            font-weight:600;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
-  .clearbtn[hidden]{display:none}
-  .clearbtn:hover{text-decoration:underline}
-  .active{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:16px 0 0}
-  .active:empty{display:none}
-  .active .lead{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
-                color:var(--muted);font-weight:600;margin-right:2px}
-  .fchip{display:inline-flex;align-items:center;gap:7px;background:var(--accent-soft);
-         color:var(--accent);border-radius:999px;padding:4px 6px 4px 11px;font-size:12.5px;font-weight:600}
-  .fchip span.k{opacity:.72;font-weight:500}
-  .fchip button{border:0;background:none;color:inherit;cursor:pointer;padding:0 4px;
-                font-size:14px;line-height:1;border-radius:999px;opacity:.7}
-  .fchip button:hover{opacity:1;background:rgba(127,127,127,.22)}
-  .clearall{border:0;background:none;color:var(--muted);font-size:12.5px;cursor:pointer;
-            text-decoration:underline;padding:4px 6px}
-  .clearall:hover{color:var(--ink)}
-  .progress{color:var(--muted);font-size:13px}
-  select{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;
-         background:var(--bg);color:var(--ink);font:inherit}
-  select[multiple]{height:112px}
-  .fields{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
-  .fieldlist{display:flex;flex-wrap:wrap;gap:8px}
-  .fieldlist label{display:inline-flex;align-items:center;gap:6px;background:var(--chip);
-       border:1px solid transparent;border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer}
-  .fieldlist label:has(input:checked){background:var(--accent-soft);border-color:var(--accent)}
-  .actions{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
-  .actions .spacer{flex:1}
-  .meta{color:var(--muted);font-size:13px;margin:22px 0 10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-        padding:15px 17px;margin-bottom:10px}
-  .card h3{margin:0 0 6px;font-size:15.5px;line-height:1.4}
-  .card h3 a{color:inherit;text-decoration:none}
-  .card h3 a:hover{color:var(--accent);text-decoration:underline}
-  .tid{color:var(--muted);font-weight:400;font-size:13px}
-  .row{font-size:13.5px;color:var(--muted);margin:3px 0}
-  .row b{color:var(--ink);font-weight:600}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
-  .chip{background:var(--chip);border-radius:999px;padding:3px 10px;font-size:11.5px;color:var(--muted)}
-  .chip.hit{background:var(--accent-soft);color:var(--accent);font-weight:600}
-  mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 2px}
-  .cmt{font-size:13.5px;color:var(--muted);margin:5px 0 0 2px;padding:4px 0 4px 11px;
-       border-left:2px solid var(--accent)}
-  .cmt .who{color:var(--ink);font-weight:600}
-  .cmt .when{opacity:.7;font-size:12px}
-  .empty{padding:34px;text-align:center;color:var(--muted)}
-  details.debug{margin-top:18px;font-size:13px;color:var(--muted)}
-  details.debug pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
-       padding:12px;overflow:auto;font-size:12px;color:var(--ink)}
-  .err{background:#fee;border:1px solid #f5b5b5;color:#8a1c1c;padding:12px;border-radius:8px}
-  @media (prefers-color-scheme:dark){.err{background:#3a1d1d;border-color:#6b2b2b;color:#ffb4b4}}
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14.5px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 24px;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .app-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .app-title span.badge {
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--accent-border);
+  }
+  .header-links {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .header-links a, .header-links button {
+    color: var(--muted);
+    text-decoration: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .header-links a:hover, .header-links button:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  /* Database Selector Bar */
+  .db-bar {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: var(--shadow-sm);
+    flex-wrap: wrap;
+  }
+  .db-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .db-select-wrap {
+    flex: 1;
+    min-width: 240px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .db-select {
+    flex: 1;
+    padding: 9px 12px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    cursor: pointer;
+    outline: none;
+    transition: var(--transition);
+  }
+  .db-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+  .btn-refresh {
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--chip);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-refresh:hover {
+    background: var(--chip-hover);
+  }
+  .db-meta-badge {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Main Filter Panel */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .searchrow {
+    display: flex;
+    gap: 10px;
+  }
+  .searchrow input[type=search] {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 16px;
+    font-size: 15px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--ink);
+    transition: var(--transition);
+  }
+  .searchrow input[type=search]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    padding: 10px 16px;
+    transition: var(--transition);
+  }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    padding: 12px 24px;
+  }
+  button.primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  /* Filter Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .filter-col {
+    display: flex;
+    flex-direction: column;
+  }
+  .lblrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  label.lbl {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .type-tag {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--chip);
+    color: var(--muted);
+    text-transform: lowercase;
+  }
+  .clearbtn {
+    border: 0;
+    background: none;
+    color: var(--accent);
+    padding: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .clearbtn[hidden] { display: none; }
+  .clearbtn:hover { text-decoration: underline; }
+
+  select {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13.5px;
+    transition: var(--transition);
+  }
+  select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+  select[multiple] {
+    height: 118px;
+  }
+
+  .number-filter-wrap {
+    display: flex;
+    gap: 6px;
+  }
+  .number-filter-wrap select {
+    width: 75px;
+    flex-shrink: 0;
+  }
+  .number-filter-wrap input[type=number] {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--ink);
+    font: inherit;
+  }
+
+  /* Search Fields Toggles */
+  .fields-section {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+  .fieldlist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .fieldlist label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--chip);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+  }
+  .fieldlist label:hover {
+    background: var(--chip-hover);
+  }
+  .fieldlist label:has(input:checked) {
+    background: var(--accent-soft);
+    border-color: var(--accent-border);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* Active Filter Chips */
+  .active-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line);
+  }
+  .active-bar:empty { display: none; }
+  .active-bar .lead {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .fchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid var(--accent-border);
+    border-radius: 999px;
+    padding: 4px 8px 4px 12px;
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+  .fchip span.k {
+    opacity: 0.75;
+    font-weight: 600;
+  }
+  .fchip button {
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 15px;
+    line-height: 1;
+    border-radius: 999px;
+    opacity: 0.7;
+  }
+  .fchip button:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.1);
+  }
+  .clearall {
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 12.5px;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 4px 8px;
+  }
+  .clearall:hover {
+    color: var(--ink);
+  }
+
+  /* Actions */
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+  .spacer { flex: 1; }
+  .hint { font-size: 13px; color: var(--muted); }
+
+  /* Results Meta */
+  .meta-bar {
+    color: var(--muted);
+    font-size: 13.5px;
+    margin: 24px 0 12px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .meta-count {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  /* Cards */
+  .results-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+  }
+  .card:hover {
+    border-color: var(--line-focus);
+    box-shadow: var(--shadow-md);
+  }
+  .card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .card h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .card h3 a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .card h3 a:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  .card-time {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* Property rows & tags */
+  .props-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+  }
+  .prop-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--chip);
+    border-radius: 6px;
+    padding: 3px 9px;
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .prop-pill span.pname {
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .prop-pill span.pval {
+    font-weight: 600;
+  }
+
+  /* Notion colors */
+  .pill-gray { background: #e5e7eb; color: #374151; }
+  .pill-blue { background: #dbeafe; color: #1e40af; }
+  .pill-green { background: #dcfce7; color: #166534; }
+  .pill-yellow { background: #fef9c3; color: #854d0e; }
+  .pill-orange { background: #ffedd5; color: #9a3412; }
+  .pill-red { background: #fee2e2; color: #991b1b; }
+  .pill-purple { background: #f3e8ff; color: #6b21a8; }
+  .pill-pink { background: #fce7f3; color: #9d174d; }
+
+  @media (prefers-color-scheme: dark) {
+    .pill-gray { background: #374151; color: #e5e7eb; }
+    .pill-blue { background: #1e3a8a; color: #bfdbfe; }
+    .pill-green { background: #14532d; color: #bbf7d0; }
+    .pill-yellow { background: #713f12; color: #fef08a; }
+    .pill-orange { background: #7c2d12; color: #fed7aa; }
+    .pill-red { background: #7f1d1d; color: #fecaca; }
+    .pill-purple { background: #581c87; color: #e9d5ff; }
+    .pill-pink { background: #831843; color: #fbcfe8; }
+  }
+
+  .text-row {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin: 6px 0;
+    line-height: 1.45;
+  }
+  .text-row b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  mark {
+    background: var(--mark);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 3px;
+  }
+
+  .cmt-box {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 8px 0 0;
+    padding: 6px 12px;
+    background: var(--panel-sub);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .cmt-box .who { color: var(--ink); font-weight: 600; }
+  .cmt-box .when { opacity: 0.75; font-size: 11.5px; }
+
+  .match-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .match-tag {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid var(--accent-border);
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .empty {
+    padding: 48px;
+    text-align: center;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+  }
+
+  /* Debug details */
+  details.debug {
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  details.debug summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 6px 0;
+  }
+  details.debug pre {
+    background: var(--panel-sub);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    overflow: auto;
+    font-size: 12px;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  .err {
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+    padding: 14px 18px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    .err { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; }
+  }
+
+  .loading-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>🛠️ Engineering Issue Tracker — Search</h1>
-    <p>Text search across Assignee, Summary, Description, Sprint, Task Name, Dependencies, Story ID, page body and comments.
-       <strong>Page Content</strong> and <strong>Comments</strong> search what Notion's own database
-       filters cannot reach. Filter values come from <a href="/api/filters" target="_blank">/api/filters</a>.</p>
+    <div class="header-top">
+      <h1 class="app-title">
+        <span>⚡ Notion Universal Search & Filter</span>
+        <span class="badge">Generic Schema</span>
+      </h1>
+      <div class="header-links">
+        <a href="/api/databases" target="_blank">📡 /api/databases</a>
+        <a href="/api/filters" id="api-filters-link" target="_blank">📋 /api/filters</a>
+        <a href="https://developers.notion.com" target="_blank" rel="noreferrer">Notion API Docs ↗</a>
+      </div>
+    </div>
   </header>
+
+  <!-- Database Selector -->
+  <div class="db-bar">
+    <span class="db-label">Database</span>
+    <div class="db-select-wrap">
+      <select id="db-select" class="db-select" title="Select a Notion Database"></select>
+      <button type="button" id="btn-refresh" class="btn-refresh" title="Refresh databases and schema from Notion">
+        🔄 Refresh
+      </button>
+    </div>
+    <div class="db-meta-badge" id="db-meta-badge"></div>
+  </div>
 
   <form class="panel" id="form">
     <div class="searchrow">
-      <input type="search" id="q" name="q" placeholder="Search text… (e.g. supplier, STORY-01, Lucas, Sprint 1)" autocomplete="off">
+      <input type="search" id="q" name="q" placeholder="Free text search across active database fields, page body & comments..." autocomplete="off">
       <button class="primary" type="submit">Search</button>
     </div>
 
-    <div class="grid">
-      <div>
-        <div class="lblrow"><label class="lbl" for="assignee">Assignee</label>
-          <button type="button" class="clearbtn" data-clear="assignee" hidden>clear</button></div>
-        <select id="assignee" multiple></select>
-      </div>
-      <div>
-        <div class="lblrow"><label class="lbl" for="sprint">Sprint</label>
-          <button type="button" class="clearbtn" data-clear="sprint" hidden>clear</button></div>
-        <select id="sprint" multiple></select>
-      </div>
-      <div>
-        <div class="lblrow"><label class="lbl" for="status">Status</label>
-          <button type="button" class="clearbtn" data-clear="status" hidden>clear</button></div>
-        <select id="status" multiple></select>
-      </div>
-      <div>
-        <div class="lblrow"><label class="lbl" for="priority">Priority</label>
-          <button type="button" class="clearbtn" data-clear="priority" hidden>clear</button></div>
-        <select id="priority" multiple></select>
-      </div>
-    </div>
+    <!-- Dynamically rendered filter controls -->
+    <div class="grid" id="filters-grid"></div>
 
-    <div class="fields">
-      <div class="lblrow"><label class="lbl">Search these fields</label>
-        <button type="button" class="clearbtn" data-clear="fields" hidden>reset to default</button></div>
+    <!-- Search fields selector -->
+    <div class="fields-section">
+      <div class="lblrow">
+        <label class="lbl">Search in text fields</label>
+        <button type="button" class="clearbtn" id="btn-reset-fields" hidden>reset to all</button>
+      </div>
       <div class="fieldlist" id="fieldlist"></div>
     </div>
 
-    <div class="active" id="active"></div>
+    <!-- Active filter chips -->
+    <div class="active-bar" id="active-bar"></div>
 
     <div class="actions">
-      <button type="button" id="reset">Clear all filters</button>
+      <button type="button" id="btn-clear-all">Clear all filters</button>
       <span class="spacer"></span>
-      <span class="row">Hold ⌘/Ctrl to pick several. Nothing selected = no filter on that column.</span>
+      <span class="hint">Hold ⌘/Ctrl to select multiple options. Changes filter dynamically.</span>
     </div>
   </form>
 
-  <div class="meta" id="meta"></div>
-  <div id="results"></div>
+  <div class="meta-bar">
+    <div class="meta-count" id="meta-count">Loading databases…</div>
+    <div id="meta-sub"></div>
+  </div>
+
+  <div id="results" class="results-grid"></div>
+
   <div class="actions" id="morewrap" hidden>
-    <button id="more">Load the remaining results</button>
+    <button id="btn-load-more" class="primary">Load the remaining results</button>
   </div>
 
   <details class="debug" id="debugwrap" hidden>
-    <summary>How this search was executed</summary>
+    <summary>Query Execution & Notion Filter Details</summary>
     <pre id="debug"></pre>
   </details>
 </div>
 
 <script type="module">
 const $ = (s) => document.querySelector(s);
-const el = (t, cls, txt) => { const n = document.createElement(t); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
+const el = (t, cls, txt) => {
+  const n = document.createElement(t);
+  if (cls) n.className = cls;
+  if (txt != null) n.textContent = txt;
+  return n;
+};
 
-const SELECTS = { assignee: 'Assignee', sprint: 'Sprint', status: 'Status', priority: 'Priority' };
-const PAGE = 100;           // rows per request; the API caps page_size at 100
-const AUTO_LOAD_LIMIT = 500; // beyond this, ask before pulling the rest
+const esc = (s) =>
+  String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-let FIELDS = [];
-let LABELS = {};   // select id -> { value: label }
-let searchToken = 0;
-
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function highlight(text, q) {
   if (!text) return '';
   if (!q) return esc(text);
@@ -173,146 +735,397 @@ function highlight(text, q) {
   return esc(text).replace(re, '<mark>$1</mark>');
 }
 
-// ---------------- setup ----------------
+const PAGE_SIZE = 100;
+const AUTO_LOAD_LIMIT = 500;
+
+let DATABASES = [];
+let ACTIVE_DB_ID = null;
+let ACTIVE_SCHEMA = null;
+let ACTIVE_FILTER_DOC = null;
+let LABELS = {}; // filter key -> { id: label }
+let SEARCH_TOKEN = 0;
+
+// ---------- Initialization ----------
 
 async function boot() {
-  const [opts, filters] = await Promise.all([
-    fetch('/api/options').then((r) => r.json()),
-    fetch('/api/filters').then((r) => r.json()),
-  ]);
+  await loadDatabases();
+}
 
-  fill('assignee', [{ id: 'none', label: '— Unassigned —' },
-    ...opts.assignees.map((a) => ({ id: a.id, label: a.label, count: a.count }))]);
-  fill('sprint', [{ id: 'none', label: '— No sprint —' },
-    ...opts.sprints.map((s) => ({ id: s.id, label: s.label, count: s.count }))]);
-  fill('status', opts.statuses.map((s) => ({ id: s, label: s })));
-  fill('priority', opts.priorities.map((s) => ({ id: s, label: s })));
+async function loadDatabases(refresh = false) {
+  $('#meta-count').innerHTML = '<span class="loading-spinner"></span> Discovering databases from Notion…';
+  try {
+    const res = await fetch('/api/databases' + (refresh ? '?refresh=1' : ''));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to discover databases');
 
-  FIELDS = filters.text_search.fields;
-  const list = $('#fieldlist');
-  for (const f of FIELDS) {
+    DATABASES = data.databases || [];
+    const select = $('#db-select');
+    select.innerHTML = '';
+
+    if (DATABASES.length === 0) {
+      select.innerHTML = '<option value="">No databases found</option>';
+      $('#meta-count').textContent = 'No databases shared with integration.';
+      return;
+    }
+
+    for (const db of DATABASES) {
+      const opt = document.createElement('option');
+      opt.value = db.id;
+      const icon = db.icon?.type === 'emoji' ? db.icon.emoji + ' ' : '📄 ';
+      opt.textContent = `${icon}${db.title} (${db.properties_count} properties)`;
+      select.appendChild(opt);
+    }
+
+    if (!ACTIVE_DB_ID || !DATABASES.some((d) => d.id === ACTIVE_DB_ID)) {
+      ACTIVE_DB_ID = DATABASES[0].id;
+    }
+    select.value = ACTIVE_DB_ID;
+
+    select.onchange = () => {
+      ACTIVE_DB_ID = select.value;
+      switchDatabase(ACTIVE_DB_ID);
+    };
+
+    await switchDatabase(ACTIVE_DB_ID, refresh);
+  } catch (err) {
+    $('#results').innerHTML = `<div class="err">${esc(err.message)}</div>`;
+    $('#meta-count').textContent = 'Error loading databases';
+  }
+}
+
+async function switchDatabase(databaseId, refresh = false) {
+  $('#meta-count').innerHTML = '<span class="loading-spinner"></span> Discovering schema & capabilities…';
+  $('#api-filters-link').href = `/api/filters?database_id=${databaseId}`;
+
+  const currentDb = DATABASES.find((d) => d.id === databaseId);
+  if (currentDb) {
+    $('#db-meta-badge').innerHTML = `
+      <span>${currentDb.properties_count} properties</span> ·
+      <a href="${esc(currentDb.url)}" target="_blank" rel="noreferrer">Open in Notion ↗</a>
+    `;
+  }
+
+  try {
+    const [optionsRes, filtersRes] = await Promise.all([
+      fetch(`/api/options?database_id=${databaseId}${refresh ? '&refresh=1' : ''}`).then((r) => r.json()),
+      fetch(`/api/filters?database_id=${databaseId}${refresh ? '&refresh=1' : ''}`).then((r) => r.json()),
+    ]);
+
+    ACTIVE_SCHEMA = optionsRes;
+    ACTIVE_FILTER_DOC = filtersRes;
+    LABELS = {};
+
+    renderDynamicControls(optionsRes, filtersRes);
+    syncControls();
+    runSearch();
+  } catch (err) {
+    $('#results').innerHTML = `<div class="err">${esc(err.message)}</div>`;
+    $('#meta-count').textContent = 'Error loading schema';
+  }
+}
+
+// ---------- Dynamic Control Rendering ----------
+
+function renderDynamicControls(schema, filterDoc) {
+  const grid = $('#filters-grid');
+  grid.innerHTML = '';
+
+  const filters = filterDoc.filters || [];
+  for (const f of filters) {
+    const col = el('div', 'filter-col');
+    const lblRow = el('div', 'lblrow');
+    const lbl = el('label', 'lbl');
+    lbl.textContent = f.parameter;
+    lbl.setAttribute('for', 'filter-' + f.field);
+
+    const typeTag = el('span', 'type-tag', f.notion_type);
+    lbl.appendChild(typeTag);
+
+    const clearBtn = el('button', 'clearbtn', 'clear');
+    clearBtn.type = 'button';
+    clearBtn.dataset.clear = f.field;
+    clearBtn.hidden = true;
+    clearBtn.onclick = () => clearOne(f.field);
+
+    lblRow.append(lbl, clearBtn);
+    col.appendChild(lblRow);
+
+    LABELS[f.field] = {};
+
+    if (f.notion_type === 'select' || f.notion_type === 'multi_select' || f.notion_type === 'status') {
+      const sel = el('select');
+      sel.id = 'filter-' + f.field;
+      sel.multiple = true;
+      sel.dataset.field = f.field;
+      sel.dataset.notionProperty = f.notion_property;
+
+      const noneOpt = new Option('— Empty / None —', 'none');
+      sel.appendChild(noneOpt);
+      LABELS[f.field]['none'] = 'Empty / None';
+
+      for (const val of f.values || []) {
+        const countTxt = val.count ? ` (${val.count})` : '';
+        const opt = new Option(`${val.name}${countTxt}`, val.name);
+        sel.appendChild(opt);
+        LABELS[f.field][val.name] = val.name;
+      }
+      sel.onchange = () => { syncControls(); runSearch(); };
+      col.appendChild(sel);
+    } else if (f.notion_type === 'people') {
+      const sel = el('select');
+      sel.id = 'filter-' + f.field;
+      sel.multiple = true;
+      sel.dataset.field = f.field;
+      sel.dataset.notionProperty = f.notion_property;
+
+      const noneOpt = new Option('— Unassigned —', 'none');
+      sel.appendChild(noneOpt);
+      LABELS[f.field]['none'] = 'Unassigned';
+
+      for (const u of f.values || []) {
+        const countTxt = u.count ? ` (${u.count})` : '';
+        const opt = new Option(`${u.label}${countTxt}`, u.id);
+        sel.appendChild(opt);
+        LABELS[f.field][u.id] = u.label;
+      }
+      sel.onchange = () => { syncControls(); runSearch(); };
+      col.appendChild(sel);
+    } else if (f.notion_type === 'relation') {
+      const sel = el('select');
+      sel.id = 'filter-' + f.field;
+      sel.multiple = true;
+      sel.dataset.field = f.field;
+      sel.dataset.notionProperty = f.notion_property;
+
+      const noneOpt = new Option('— No relation —', 'none');
+      sel.appendChild(noneOpt);
+      LABELS[f.field]['none'] = 'No relation';
+
+      for (const t of f.values || []) {
+        const countTxt = t.count ? ` (${t.count})` : '';
+        const opt = new Option(`${t.label}${countTxt}`, t.id);
+        sel.appendChild(opt);
+        LABELS[f.field][t.id] = t.label;
+      }
+      sel.onchange = () => { syncControls(); runSearch(); };
+      col.appendChild(sel);
+    } else if (f.notion_type === 'checkbox') {
+      const sel = el('select');
+      sel.id = 'filter-' + f.field;
+      sel.dataset.field = f.field;
+      sel.dataset.notionProperty = f.notion_property;
+      sel.appendChild(new Option('All', ''));
+      sel.appendChild(new Option('Checked (True)', 'true'));
+      sel.appendChild(new Option('Unchecked (False)', 'false'));
+      LABELS[f.field]['true'] = 'Checked';
+      LABELS[f.field]['false'] = 'Unchecked';
+      sel.onchange = () => { syncControls(); runSearch(); };
+      col.appendChild(sel);
+    } else if (f.notion_type === 'number') {
+      const wrap = el('div', 'number-filter-wrap');
+      const opSel = el('select');
+      opSel.id = 'filter-op-' + f.field;
+      opSel.appendChild(new Option('=', ''));
+      opSel.appendChild(new Option('>=', '>='));
+      opSel.appendChild(new Option('<=', '<='));
+      opSel.appendChild(new Option('>', '>'));
+      opSel.appendChild(new Option('<', '<'));
+      opSel.appendChild(new Option('!=', '!='));
+
+      const numInput = el('input');
+      numInput.type = 'number';
+      numInput.id = 'filter-' + f.field;
+      numInput.dataset.field = f.field;
+      numInput.dataset.notionProperty = f.notion_property;
+      numInput.placeholder = f.format || '0';
+
+      opSel.onchange = () => { syncControls(); runSearch(); };
+      numInput.oninput = () => { syncControls(); runSearch(); };
+      wrap.append(opSel, numInput);
+      col.appendChild(wrap);
+    }
+
+    grid.appendChild(col);
+  }
+
+  // Render text search fields list
+  const fieldlist = $('#fieldlist');
+  fieldlist.innerHTML = '';
+  const textFields = filterDoc.text_search?.fields || [];
+  for (const tf of textFields) {
     const lab = el('label');
     const cb = el('input');
-    cb.type = 'checkbox'; cb.value = f.key; cb.checked = f.searched_by_default;
-    cb.addEventListener('change', syncControls);
-    lab.append(cb, document.createTextNode(f.label));
-    lab.title = `${f.notion_property || 'page body'} · ${f.notion_type}`;
-    list.append(lab);
+    cb.type = 'checkbox';
+    cb.value = tf.key;
+    cb.checked = tf.searched_by_default !== false;
+    cb.onchange = () => { syncControls(); runSearch(); };
+    lab.append(cb, document.createTextNode(tf.label));
+    lab.title = `${tf.notion_property || 'virtual'} · ${tf.notion_type}`;
+    fieldlist.appendChild(lab);
   }
-  syncControls();
-  runSearch();
 }
 
-function fill(id, items) {
-  const sel = $('#' + id);
-  sel.innerHTML = '';
-  LABELS[id] = {};
-  for (const it of items) {
-    // The dropdown shows the task count; the filter chip uses the bare name.
-    sel.append(new Option(it.count ? `${it.label} (${it.count})` : it.label, it.id));
-    LABELS[id][it.id] = it.label;
-  }
-  sel.addEventListener('change', () => { syncControls(); runSearch(); });
-}
+// ---------- Filter Helpers ----------
 
-const picked = (id) => [...$('#' + id).selectedOptions].map((o) => o.value);
-const checkedFields = () => [...$('#fieldlist').querySelectorAll('input:checked')].map((c) => c.value);
-const fieldsAreDefault = () => {
-  const now = checkedFields().sort().join();
-  return now === FIELDS.filter((f) => f.searched_by_default).map((f) => f.key).sort().join();
+const pickedValues = (field) => {
+  const el = $('#filter-' + field);
+  if (!el) return [];
+  if (el.tagName === 'SELECT' && el.multiple) {
+    return [...el.selectedOptions].map((o) => o.value);
+  }
+  if (el.tagName === 'SELECT') {
+    return el.value ? [el.value] : [];
+  }
+  if (el.tagName === 'INPUT' && el.type === 'number') {
+    const val = el.value.trim();
+    if (!val) return [];
+    const op = $('#filter-op-' + field)?.value || '';
+    return [op + val];
+  }
+  return el.value ? [el.value.trim()] : [];
 };
 
-// ---------------- clearing ----------------
+const checkedFields = () =>
+  [...$('#fieldlist').querySelectorAll('input:checked')].map((c) => c.value);
 
-function clearOne(key) {
-  if (key === 'fields') {
-    for (const cb of $('#fieldlist').querySelectorAll('input')) {
-      cb.checked = FIELDS.find((f) => f.key === cb.value)?.searched_by_default ?? false;
-    }
-  } else if (key === 'q') {
-    $('#q').value = '';
+const allFields = () =>
+  [...$('#fieldlist').querySelectorAll('input')].map((c) => c.value);
+
+const fieldsAreDefault = () => {
+  const now = checkedFields().sort().join();
+  const all = allFields().sort().join();
+  return now === all;
+};
+
+function clearOne(field) {
+  const el = $('#filter-' + field);
+  if (!el) return;
+  if (el.tagName === 'SELECT' && el.multiple) {
+    for (const o of el.options) o.selected = false;
+  } else if (el.tagName === 'SELECT') {
+    el.value = '';
   } else {
-    for (const o of $('#' + key).options) o.selected = false;
+    el.value = '';
   }
   syncControls();
   runSearch();
 }
 
-function clearValue(key, value) {
-  for (const o of $('#' + key).options) if (o.value === value) o.selected = false;
+function clearValue(field, value) {
+  const el = $('#filter-' + field);
+  if (!el) return;
+  if (el.tagName === 'SELECT' && el.multiple) {
+    for (const o of el.options) {
+      if (o.value === value) o.selected = false;
+    }
+  } else {
+    el.value = '';
+  }
   syncControls();
   runSearch();
 }
 
 function clearAll() {
   $('#q').value = '';
-  for (const key of Object.keys(SELECTS)) for (const o of $('#' + key).options) o.selected = false;
+  for (const f of ACTIVE_FILTER_DOC?.filters || []) {
+    clearOne(f.field);
+  }
   for (const cb of $('#fieldlist').querySelectorAll('input')) {
-    cb.checked = FIELDS.find((f) => f.key === cb.value)?.searched_by_default ?? false;
+    cb.checked = true;
   }
   syncControls();
   runSearch();
 }
 
-/** Keep the "clear" affordances and the active-filter chips in step with the form. */
 function syncControls() {
-  for (const key of Object.keys(SELECTS)) {
-    $(`.clearbtn[data-clear="${key}"]`).hidden = picked(key).length === 0;
+  const filters = ACTIVE_FILTER_DOC?.filters || [];
+  for (const f of filters) {
+    const vals = pickedValues(f.field);
+    const clearBtn = $(`.clearbtn[data-clear="${f.field}"]`);
+    if (clearBtn) clearBtn.hidden = vals.length === 0;
   }
-  $('.clearbtn[data-clear="fields"]').hidden = fieldsAreDefault();
 
-  const bar = $('#active');
+  $('#btn-reset-fields').hidden = fieldsAreDefault();
+
+  const bar = $('#active-bar');
   bar.innerHTML = '';
   const chips = [];
+
   const q = $('#q').value.trim();
-  if (q) chips.push({ k: 'Text', label: `"${q}"`, onclear: () => clearOne('q') });
-  for (const [key, title] of Object.entries(SELECTS)) {
-    for (const v of picked(key)) {
-      chips.push({ k: title, label: LABELS[key][v] ?? v, onclear: () => clearValue(key, v) });
+  if (q) chips.push({ field: 'q', k: 'Search', label: `"${q}"`, onclear: () => { $('#q').value = ''; syncControls(); runSearch(); } });
+
+  for (const f of filters) {
+    for (const v of pickedValues(f.field)) {
+      const label = LABELS[f.field]?.[v] || v;
+      chips.push({
+        field: f.field,
+        k: f.parameter,
+        label,
+        onclear: () => clearValue(f.field, v),
+      });
     }
   }
+
   if (!fieldsAreDefault()) {
-    const names = checkedFields().map((k) => FIELDS.find((f) => f.key === k)?.label ?? k);
-    chips.push({ k: 'Fields', label: names.length ? names.join(', ') : 'none', onclear: () => clearOne('fields') });
+    const sel = checkedFields();
+    chips.push({
+      field: 'fields',
+      k: 'Fields',
+      label: sel.length ? sel.join(', ') : 'none',
+      onclear: () => {
+        for (const cb of $('#fieldlist').querySelectorAll('input')) cb.checked = true;
+        syncControls();
+        runSearch();
+      },
+    });
   }
+
   if (!chips.length) return;
 
-  bar.append(el('span', 'lead', 'Filtering by'));
+  bar.append(el('span', 'lead', 'Active Filters'));
   for (const c of chips) {
     const chip = el('span', 'fchip');
     chip.append(el('span', 'k', c.k + ':'), document.createTextNode(' ' + c.label));
     const x = el('button', null, '×');
     x.type = 'button';
     x.title = `Remove ${c.k} filter`;
-    x.addEventListener('click', c.onclear);
+    x.onclick = c.onclear;
     chip.append(x);
     bar.append(chip);
   }
+
   const all = el('button', 'clearall', 'Clear all');
   all.type = 'button';
-  all.addEventListener('click', clearAll);
+  all.onclick = clearAll;
   bar.append(all);
 }
 
-// ---------------- searching ----------------
+// ---------- Search Execution ----------
 
-function collect() {
+function collectParams() {
   const p = new URLSearchParams();
+  if (ACTIVE_DB_ID) p.set('database_id', ACTIVE_DB_ID);
+
   const q = $('#q').value.trim();
   if (q) p.set('q', q);
-  if (!fieldsAreDefault()) p.set('fields', checkedFields().join(','));
-  for (const key of Object.keys(SELECTS)) {
-    const v = picked(key);
-    if (v.length) p.set(key, v.join(','));
+
+  if (!fieldsAreDefault()) {
+    p.set('fields', checkedFields().join(','));
   }
-  p.set('page_size', String(PAGE));
+
+  for (const f of ACTIVE_FILTER_DOC?.filters || []) {
+    const vals = pickedValues(f.field);
+    if (vals.length) {
+      p.set(f.parameter, vals.join(','));
+    }
+  }
+  p.set('page_size', String(PAGE_SIZE));
   return p;
 }
 
-/** Fetch every matching row, not just the first page. */
 async function runSearch(startOffset = 0, params = null) {
-  const token = ++searchToken;
-  const base = params ?? collect();
+  const token = ++SEARCH_TOKEN;
+  const base = params ?? collectParams();
   const box = $('#results');
   if (startOffset === 0) box.innerHTML = '';
   $('#morewrap').hidden = true;
@@ -322,7 +1135,9 @@ async function runSearch(startOffset = 0, params = null) {
   const q = base.get('q') || '';
 
   while (true) {
-    $('#meta').textContent = shown ? `Loaded ${shown}…` : 'Searching…';
+    $('#meta-count').innerHTML = shown
+      ? `<span class="loading-spinner"></span> Loaded ${shown} results…`
+      : '<span class="loading-spinner"></span> Searching Notion…';
 
     const p = new URLSearchParams(base);
     if (offset) p.set('offset', String(offset));
@@ -333,90 +1148,158 @@ async function runSearch(startOffset = 0, params = null) {
       data = await res.json();
       if (!res.ok) throw new Error(data.error || res.statusText);
     } catch (e) {
-      if (token !== searchToken) return;
-      $('#meta').textContent = '';
+      if (token !== SEARCH_TOKEN) return;
+      $('#meta-count').textContent = 'Search error';
       box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
       return;
     }
-    if (token !== searchToken) return; // a newer search superseded this one
 
-    for (const r of data.results) box.append(card(r, q));
-    shown += data.results.length;
-    offset += data.results.length;
+    if (token !== SEARCH_TOKEN) return;
+
+    for (const r of data.results || []) {
+      box.append(renderCard(r, q));
+    }
+    shown += (data.results || []).length;
+    offset += (data.results || []).length;
 
     $('#debugwrap').hidden = !data.notion_filter && !data.text_matching;
     $('#debug').textContent = JSON.stringify(
-      { notion_filter: data.notion_filter, text_matching: data.text_matching }, null, 2);
+      { database: data.database, notion_filter: data.notion_filter, text_matching: data.text_matching },
+      null,
+      2,
+    );
 
-    if (data.notice) { $('#meta').textContent = data.notice; return; }
-
-    if (!data.has_more) {
-      $('#meta').textContent = shown === 0 ? '' : `${data.total} result${data.total === 1 ? '' : 's'} — all shown`;
-      if (!shown) box.append(el('div', 'empty', 'No matching tasks.'));
+    if (data.notice) {
+      $('#meta-count').textContent = data.notice;
       return;
     }
 
-    if (shown >= AUTO_LOAD_LIMIT) { // very large set: hand control back to the user
-      $('#meta').textContent = `${data.total} results — showing ${shown}`;
-      const more = $('#more');
-      more.textContent = `Load the remaining ${data.total - shown}`;
-      more.onclick = () => runSearch(offset, base);
+    if (!data.has_more) {
+      $('#meta-count').textContent = shown === 0 ? '0 results' : `${data.total} result${data.total === 1 ? '' : 's'}`;
+      if (!shown) {
+        box.append(el('div', 'empty', 'No matching items found for current filters.'));
+      }
+      return;
+    }
+
+    if (shown >= AUTO_LOAD_LIMIT) {
+      $('#meta-count').textContent = `${data.total} results — showing ${shown}`;
+      const moreBtn = $('#btn-load-more');
+      moreBtn.textContent = `Load the remaining ${data.total - shown}`;
+      moreBtn.onclick = () => runSearch(offset, base);
       $('#morewrap').hidden = false;
       return;
     }
   }
 }
 
-function card(r, q) {
-  const c = el('div', 'card');
-  const h = el('h3');
-  h.innerHTML = `<a href="${esc(r.url)}" target="_blank" rel="noreferrer">${highlight(r.task_name, q)}</a>
-                 <span class="tid">#${esc(r.task_id ?? '')}</span>`;
-  c.append(h);
+// ---------- Result Card Rendering ----------
 
-  if (r.summary) c.append(rowLine('Summary', r.summary, q));
-  if (r.description) c.append(rowLine('Description', r.description, q));
-  if (r.story_id) c.append(rowLine('Story ID', r.story_id, q));
-  if (r.dependencies) c.append(rowLine('Dependencies', r.dependencies, q));
-  if (r.page_content) c.append(rowLine('Page body', r.page_content, q));
+function renderCard(r, q) {
+  const card = el('div', 'card');
+  const header = el('div', 'card-header');
+  const h3 = el('h3');
+  h3.innerHTML = `<a href="${esc(r.url)}" target="_blank" rel="noreferrer">${highlight(r.title || 'Untitled', q)}</a>`;
 
+  header.append(h3);
+  if (r.last_edited_time) {
+    const time = el('span', 'card-time', 'Updated ' + r.last_edited_time.slice(0, 10));
+    header.append(time);
+  }
+  card.append(header);
+
+  // Property tags row
+  const propsRow = el('div', 'props-row');
+  for (const [pname, pval] of Object.entries(r.properties || {})) {
+    if (pval == null || pval === '' || (Array.isArray(pval) && !pval.length)) continue;
+    if (pname === ACTIVE_SCHEMA?.title_property) continue;
+
+    if (typeof pval === 'object' && pval.name && pval.color) {
+      const pill = el('span', `prop-pill pill-${pval.color}`);
+      pill.innerHTML = `<span class="pname">${esc(pname)}:</span> <span class="pval">${esc(pval.name)}</span>`;
+      propsRow.append(pill);
+    } else if (Array.isArray(pval) && pval.length && pval[0]?.label) {
+      const pill = el('span', 'prop-pill');
+      const labels = pval.map((x) => esc(x.label)).join(', ');
+      pill.innerHTML = `<span class="pname">${esc(pname)}:</span> <span class="pval">${labels}</span>`;
+      propsRow.append(pill);
+    } else if (typeof pval === 'number' || typeof pval === 'boolean') {
+      const pill = el('span', 'prop-pill');
+      pill.innerHTML = `<span class="pname">${esc(pname)}:</span> <span class="pval">${String(pval)}</span>`;
+      propsRow.append(pill);
+    } else if (typeof pval === 'string' && pval.length < 50 && !pval.includes('\n')) {
+      const pill = el('span', 'prop-pill');
+      pill.innerHTML = `<span class="pname">${esc(pname)}:</span> <span class="pval">${highlight(pval, q)}</span>`;
+      propsRow.append(pill);
+    }
+  }
+  if (propsRow.childNodes.length) card.append(propsRow);
+
+  // Text content / descriptions
+  for (const [pname, pval] of Object.entries(r.properties || {})) {
+    if (typeof pval === 'string' && (pval.length >= 50 || pval.includes('\n'))) {
+      const textRow = el('div', 'text-row');
+      textRow.innerHTML = `<b>${esc(pname)}:</b> ${highlight(pval, q)}`;
+      card.append(textRow);
+    }
+  }
+
+  // Page body snippet
+  if (r.page_content) {
+    const bodyRow = el('div', 'text-row');
+    bodyRow.innerHTML = `<b>Page Content:</b> ${highlight(r.page_content, q)}`;
+    card.append(bodyRow);
+  }
+
+  // Comments
   for (const cm of r.comments || []) {
-    const d = el('div', 'cmt');
-    const who = cm.author ? `${esc(cm.author)}` : 'Comment';
-    const when = cm.created_time ? ` <span class="when">${esc(cm.created_time.slice(0, 10))}</span>` : '';
-    const tag = cm.inline ? ' <span class="when">· inline</span>' : '';
-    d.innerHTML = `<span class="who">💬 ${who}</span>${when}${tag}<br>${highlight(cm.excerpt || cm.text, q)}`;
-    c.append(d);
+    const box = el('div', 'cmt-box');
+    const who = cm.author ? esc(cm.author) : 'Comment';
+    const when = cm.created_time ? ` <span class="when">· ${esc(cm.created_time.slice(0, 10))}</span>` : '';
+    const inlineTag = cm.inline ? ' <span class="when">· inline</span>' : '';
+    box.innerHTML = `<span class="who">💬 ${who}</span>${when}${inlineTag}<br>${highlight(cm.excerpt || cm.text, q)}`;
+    card.append(box);
   }
 
-  c.append(rowLine('Assignee', r.assignees.map((a) => a.label).join(', ') || '—', q));
-  c.append(rowLine('Sprint', r.sprint.map((s) => s.label).join(', ') || '—', q));
-
-  const chips = el('div', 'chips');
-  for (const [t, v] of [['Status', r.status], ['Priority', r.priority], ['Project', r.project]]) {
-    if (v) chips.append(el('span', 'chip', `${t}: ${v}`));
+  // Matched fields tags
+  if (r.matched_fields && r.matched_fields.length) {
+    const matchTags = el('div', 'match-tags');
+    for (const m of r.matched_fields) {
+      matchTags.append(el('span', 'match-tag', `matched: ${m}`));
+    }
+    card.append(matchTags);
   }
-  if (r.comment_count) chips.append(el('span', 'chip', `💬 ${r.comment_count}`));
-  for (const m of r.matched_fields) chips.append(el('span', 'chip hit', `match: ${m}`));
-  c.append(chips);
-  return c;
+
+  return card;
 }
 
-function rowLine(label, value, q) {
-  const d = el('div', 'row');
-  d.innerHTML = `<b>${label}:</b> ${highlight(value, q)}`;
-  return d;
-}
+// ---------- Event Listeners ----------
 
-// ---------------- wiring ----------------
+$('#form').onsubmit = (e) => {
+  e.preventDefault();
+  syncControls();
+  runSearch();
+};
 
-$('#form').addEventListener('submit', (e) => { e.preventDefault(); syncControls(); runSearch(); });
-$('#q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); syncControls(); runSearch(); } });
-$('#q').addEventListener('input', () => { if (!$('#q').value.trim()) syncControls(); });
-$('#reset').addEventListener('click', clearAll);
-for (const b of document.querySelectorAll('.clearbtn')) {
-  b.addEventListener('click', () => clearOne(b.dataset.clear));
-}
+$('#q').onkeydown = (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    syncControls();
+    runSearch();
+  }
+};
+
+$('#q').oninput = () => {
+  if (!$('#q').value.trim()) syncControls();
+};
+
+$('#btn-clear-all').onclick = clearAll;
+$('#btn-refresh').onclick = () => loadDatabases(true);
+$('#btn-reset-fields').onclick = () => {
+  for (const cb of $('#fieldlist').querySelectorAll('input')) cb.checked = true;
+  syncControls();
+  runSearch();
+};
 
 boot();
 </script>
