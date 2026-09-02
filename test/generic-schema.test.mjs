@@ -44,9 +44,8 @@ for (const db of databases) {
   await t(`generates filter instructions capability document for "${db.title}" by ID and title`, async () => {
     const docById = await filterInstructions({ databaseId: db.id });
     assert.equal(docById.database.id, db.id);
-    assert.ok(docById.how_to_call);
-    assert.ok(docById.text_search);
-    assert.ok(Array.isArray(docById.filters));
+    assert.ok(docById.how_to_search);
+    assert.ok(docById.filters && typeof docById.filters === 'object');
     assert.ok(Array.isArray(docById.examples));
 
     const docByTitle = await filterInstructions({ databaseId: db.title });

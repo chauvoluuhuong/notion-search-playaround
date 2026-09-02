@@ -81,7 +81,7 @@ export async function buildQuery(databaseId, params = {}) {
         const users = schema.people_by_property[propName] || [];
         const res = resolveIdFilter(vals, users, propName, 'people');
         if (res.unmatched) {
-          return { error: `Unknown ${propName} "${res.unmatched}". See GET /api/filters for allowed values.` };
+          return { error: `Unknown ${propName} "${res.unmatched}". See GET /api/filter-instructions for allowed values.` };
         }
         resolved[propName] = res.ids;
         if (res.leaves.length) {
@@ -94,7 +94,7 @@ export async function buildQuery(databaseId, params = {}) {
         const targets = schema.relations_by_property[propName] || [];
         const res = resolveIdFilter(vals, targets, propName, 'relation');
         if (res.unmatched) {
-          return { error: `Unknown ${propName} "${res.unmatched}". See GET /api/filters for allowed values.` };
+          return { error: `Unknown ${propName} "${res.unmatched}". See GET /api/filter-instructions for allowed values.` };
         }
         resolved[propName] = res.ids;
         if (res.leaves.length) {
@@ -312,14 +312,24 @@ function shapeGeneric(page, schema, body, comments) {
  */
 function matchFieldsGeneric(row, q, activeTextFields, schema) {
   const t = q.toLowerCase();
-  const hit = (v) => typeof v === 'string' && v.toLowerCase().includes(t);
+  const hit = (v) => {
+    if (v == null) return false;
+    if (typeof v === 'string') return v.toLowerCase().includes(t);
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v).toLowerCase().includes(t);
+    if (Array.isArray(v)) return v.some((item) => hit(item?.label || item?.name || item?.title || item));
+    if (typeof v === 'object') return hit(v.name || v.label || v.title);
+    return false;
+  };
+
   const out = [];
 
   for (const f of activeTextFields) {
     if (f.key === 'page_content') {
       if (hit(row.page_content)) out.push('page_content');
     } else if (f.key === 'comment') {
-      if (row.comments.some((c) => hit(c.text))) out.push('comment');
+      if (row.comments && row.comments.some((c) => hit(c.text) || hit(c.author))) {
+        out.push('comment');
+      }
     } else if (f.notion_type === 'people') {
       const users = schema.people_by_property[f.notion_property] || [];
       const userIds = resolveValues(q, users);
@@ -346,8 +356,32 @@ function matchFieldsGeneric(row, q, activeTextFields, schema) {
 }
 
 export async function search(params = {}) {
-  const rawDb = params.database_id || params.database;
-  const built = await buildQuery(rawDb, params);
+  const rawDb = params.databaseId || params.database_id || params.database;
+
+  // Extract filter parameters from filter object or top-level properties
+  const filterParams = {};
+  if (typeof params.filter === 'object' && params.filter !== null) {
+    Object.assign(filterParams, params.filter);
+  }
+  if (typeof params.filters === 'object' && params.filters !== null) {
+    Object.assign(filterParams, params.filters);
+  }
+  const RESERVED = new Set([
+    'databaseId', 'database_id', 'database',
+    'searchText', 'search_text', 'q',
+    'filter', 'filters', 'fields',
+    'pageSize', 'page_size', 'offset', 'startCursor', 'start_cursor',
+    'refresh',
+  ]);
+  for (const [k, v] of Object.entries(params)) {
+    if (!RESERVED.has(k) && v !== undefined && v !== null && v !== '') {
+      if (filterParams[k] === undefined) {
+        filterParams[k] = v;
+      }
+    }
+  }
+
+  const built = await buildQuery(rawDb, filterParams);
   if (built.error) {
     return {
       results: [],
@@ -357,25 +391,24 @@ export async function search(params = {}) {
       has_more: false,
       next_cursor: null,
       notice: built.error,
+      filter_applied: null,
       notion_filter: null,
       text_matching: null,
     };
   }
 
   const { filter, resolved, schema, databaseId } = built;
-  const q = String(params.q ?? '').trim();
+  const q = String(params.searchText ?? params.search_text ?? params.q ?? '').trim();
 
   // Discover all text-capable fields for this database
   const allTextFields = [];
   for (const p of schema.properties) {
-    if (p.type === 'title' || p.type === 'rich_text' || p.type === 'people' || p.type === 'relation') {
-      allTextFields.push({
-        key: slugify(p.name),
-        label: p.name,
-        notion_property: p.name,
-        notion_type: p.type,
-      });
-    }
+    allTextFields.push({
+      key: slugify(p.name),
+      label: p.name,
+      notion_property: p.name,
+      notion_type: p.type,
+    });
   }
   allTextFields.push(
     { key: 'page_content', label: 'Page Content', notion_property: null, notion_type: 'page_content' },
@@ -390,12 +423,12 @@ export async function search(params = {}) {
   const wantsBody = activeFields.some((f) => f.key === 'page_content');
   const wantsComments = activeFields.some((f) => f.key === 'comment');
 
-  const pageSize = Math.min(Math.max(Number(params.page_size) || 25, 1), 100);
-  const offset = Math.max(Number(params.offset ?? params.start_cursor) || 0, 0);
+  const pageSize = Math.min(Math.max(Number(params.pageSize ?? params.page_size) || 25, 1), 100);
+  const offset = Math.max(Number(params.offset ?? params.startCursor ?? params.start_cursor) || 0, 0);
 
   const [{ rows, truncated }, content] = await Promise.all([
     fetchCandidates(databaseId, filter),
-    q && (wantsBody || wantsComments) ? getContentIndex(databaseId) : Promise.resolve(null),
+    getContentIndex(databaseId),
   ]);
 
   let shaped = rows.map((p) =>
@@ -416,11 +449,9 @@ export async function search(params = {}) {
     textMatching = {
       term: q,
       fields: activeFields.map((f) => f.key),
-      notion_filter_equivalent: equivalentTextFilter(activeFields, q, schema),
       page_content: wantsBody
         ? {
             matched_in_process: true,
-            reason: 'Notion database filters cannot read page body text.',
             pages_indexed: content?.pages_indexed ?? 0,
             indexed_at: content?.built_at ?? null,
           }
@@ -428,11 +459,13 @@ export async function search(params = {}) {
       comment: wantsComments
         ? {
             matched_in_process: true,
-            reason: 'Notion database filters cannot read comments.',
             comments_indexed: content?.comments_indexed ?? 0,
             pages_with_comments: content?.pages_with_comments ?? 0,
             inline_comments_indexed: content?.inline_comments_indexed ?? false,
-            caveat: "Notion's API returns unresolved comments only; resolved threads cannot be read.",
+            permission_denied: content?.comments_permission_denied ?? false,
+            caveat: content?.comments_permission_denied
+              ? 'Notion integration token lacks "Read comments" capability. To search comments, enable "Read comments" on your integration at https://www.notion.so/my-integrations.'
+              : 'Unresolved comments are included; resolved threads are excluded.',
             indexed_at: content?.built_at ?? null,
           }
         : null,
@@ -468,7 +501,8 @@ export async function search(params = {}) {
     has_more: offset + slice.length < total,
     next_cursor: offset + slice.length < total ? String(offset + slice.length) : null,
     notice: truncated ? `Only the first ${rows.length} rows were scanned.` : null,
-    notion_filter: filter ?? null,
+    filter_applied: filter ?? null,
+    notion_filter: filter ?? null, // alias for backwards compatibility
     text_matching: textMatching,
     resolved,
   };

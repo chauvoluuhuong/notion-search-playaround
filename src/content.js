@@ -53,7 +53,7 @@ async function pageBody(pageId) {
  * Comment threads on a page.
  * Notion's comments endpoint returns only UNRESOLVED comments.
  */
-async function pageComments(pageId, blockIds) {
+async function pageComments(pageId, blockIds, state = {}) {
   const targets = [pageId, ...(INDEX_INLINE_COMMENTS ? blockIds : [])];
   const out = [];
   const seen = new Set();
@@ -79,8 +79,10 @@ async function pageComments(pageId, blockIds) {
         }
         cursor = res.has_more ? res.next_cursor : undefined;
       } while (cursor);
-    } catch {
-      // No "read comments" capability, or target is not readable.
+    } catch (err) {
+      if (err.status === 403 || (err.message && err.message.toLowerCase().includes('permission'))) {
+        state.permission_denied = true;
+      }
     }
   }
   out.sort((a, b) => String(a.created_time).localeCompare(String(b.created_time)));
@@ -118,9 +120,10 @@ async function buildContent(databaseId) {
     }
   }
 
+  const state = { permission_denied: false };
   const built = await pool(rows, async (p) => {
     const body = await pageBody(p.id);
-    const comments = await pageComments(p.id, body.blockIds);
+    const comments = await pageComments(p.id, body.blockIds, state);
     return { text: body.text, comments };
   });
 
@@ -140,6 +143,7 @@ async function buildContent(databaseId) {
     pages_with_body: built.filter((b) => b.text).length,
     pages_with_comments: built.filter((b) => b.comments.length).length,
     comments_indexed: commentTotal,
+    comments_permission_denied: state.permission_denied,
     inline_comments_indexed: INDEX_INLINE_COMMENTS,
     truncated: rows.length >= MAX_PAGES,
     built_at: new Date().toISOString(),

@@ -11,7 +11,7 @@ export class NotionError extends Error {
   }
 }
 
-async function request(method, pathname, body) {
+async function request(method, pathname, body, retries = 3) {
   const res = await fetch(BASE + pathname, {
     method,
     headers: {
@@ -22,6 +22,12 @@ async function request(method, pathname, body) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({}));
+  if (res.status === 429 && retries > 0) {
+    const retryAfterSec = Number(res.headers.get('retry-after')) || 2;
+    const waitMs = Math.min(retryAfterSec * 1000, 6000);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    return request(method, pathname, body, retries - 1);
+  }
   if (!res.ok) throw new NotionError(res.status, json);
   return json;
 }

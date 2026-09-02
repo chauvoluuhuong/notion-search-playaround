@@ -19,7 +19,7 @@ npm start        # http://localhost:3100
 | Filter Instructions / Capabilities | `GET /api/filter-instructions/:id` or `GET /api/filter-instructions` |
 | Filter Capability & Schema API | `GET /api/filters/:id` or `GET /api/filters?database_id=<id>` |
 | Dropdown & Option Values | `GET /api/options?database_id=<id>` |
-| Universal Search & Filter API | `GET /api/search` / `POST /api/search` |
+| Universal Search & Filter API | `POST /api/search` |
 
 ---
 
@@ -55,61 +55,123 @@ Force a cache refresh: `GET /api/databases?refresh=1`.
 
 ---
 
-## 2. Schema Discovery & Filter Instructions (`GET /api/filter-instructions/:id` or `GET /api/filters`)
+## 2. Schema Discovery & Filter Instructions (`GET /api/filter-instructions/:id`)
 
-Given any database ID or title, returns a self-describing capability document with:
-- All properties and their Notion types (`select`, `multi_select`, `status`, `people`, `relation`, `number`, `date`, `checkbox`, `rich_text`, `title`, etc.)
-- Supported filter operators for each field
-- Allowed values, counts, and Notion colors
-- Automatically resolved target page titles for relations
-- Searchable text fields including page body and unresolved comments
+Returns a simple, self-describing capability document tailored for AI Agents and API clients, detailing:
+- Available fields and their accepted values / formats
+- `how_to_search` body format for `POST /api/search`
+- Example request payloads
+
+```json
+{
+  "database": {
+    "id": "bdaec82f-2142-4cf9-a017-ba7b47678e6c",
+    "name": "IT Epics"
+  },
+  "how_to_search": {
+    "method": "POST",
+    "endpoint": "/api/search",
+    "body_format": {
+      "databaseId": "bdaec82f-2142-4cf9-a017-ba7b47678e6c",
+      "searchText": "Case-insensitive search across all fields, page body, and comments",
+      "filter": "Map of field names to values. Pass an array of values to match any (OR).",
+      "pageSize": 25,
+      "offset": 0
+    }
+  },
+  "filters": {
+    "Owner": {
+      "type": "array of values",
+      "accepted_values": ["chauvoluuhuong", "huong", "none"]
+    },
+    "Goal": {
+      "type": "free text"
+    },
+    "Status": {
+      "type": "array of values",
+      "accepted_values": ["Planned", "In progress", "Done", "none"]
+    },
+    "Start": {
+      "type": "date (YYYY-MM-DD or relative keyword)",
+      "accepted_values": ["YYYY-MM-DD", "past_week", "this_week", "next_week", "past_month"]
+    },
+    "Epic": {
+      "type": "free text"
+    }
+  },
+  "examples": [
+    {
+      "description": "Free text search across all fields",
+      "request": {
+        "databaseId": "bdaec82f-2142-4cf9-a017-ba7b47678e6c",
+        "searchText": "access"
+      }
+    },
+    {
+      "description": "Filter by Status",
+      "request": {
+        "databaseId": "bdaec82f-2142-4cf9-a017-ba7b47678e6c",
+        "filter": {
+          "Status": "Planned"
+        }
+      }
+    }
+  ]
+}
+```
 
 ```bash
-# Get instructions by database ID in the path
 curl "http://localhost:3100/api/filter-instructions/9d483ce4-2747-4ea3-a741-bc9a2bc98c4e"
-
-# Or with query parameter
-curl "http://localhost:3100/api/filters?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e"
 ```
 
 ---
 
-## 3. Universal Search & Filtering (`GET /api/search` and `POST /api/search`)
+## 3. Universal Search & Filtering (`POST /api/search`)
 
-Filter any field on any database dynamically:
+The search endpoint accepts a JSON object with:
+- `databaseId`: Database ID or title (optional if using default database)
+- `searchText`: Case-insensitive text search across all fields, page content, and comments
+- `filter`: Object mapping field names to value(s) (multiple values for a field are OR-ed)
+- `pageSize`: Number of results (default: 25)
+- `offset`: Pagination offset (default: 0)
 
-### By Select / Status / Multi-select
-```bash
-# Filter by Priority
-curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&Priority=P0"
-
-# Multiple options (OR)
-curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&Priority=P0,P1"
-
-# Filter by Status
-curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&Status=In%20progress"
-```
-
-### By Relation (Auto Title Resolution)
-Pass the human title of the related page; the engine automatically resolves it to the page UUID:
-```bash
-curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&Epic=Identity%20%26%20access%20cleanup"
-```
-
-### Free Text Search (`q`) Across Properties, Page Body & Comments
-```bash
-curl "http://localhost:3100/api/search?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e&q=automated%20checklist"
-```
-
-### POST JSON API
+### Free Text Search (`searchText`)
 ```bash
 curl -X POST "http://localhost:3100/api/search" \
   -H "Content-Type: application/json" \
   -d '{
-    "database_id": "9d483ce4-2747-4ea3-a741-bc9a2bc98c4e",
-    "Priority": ["P0", "P1"],
-    "Sprint": "Sprint 1",
-    "q": "access"
+    "databaseId": "9d483ce4-2747-4ea3-a741-bc9a2bc98c4e",
+    "searchText": "access"
+  }'
+```
+
+### Structured Filtering (`filter`)
+```bash
+# Filter by Priority and Status
+curl -X POST "http://localhost:3100/api/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "databaseId": "9d483ce4-2747-4ea3-a741-bc9a2bc98c4e",
+    "filter": {
+      "Priority": ["P0", "P1"],
+      "Status": "In progress"
+    }
+  }'
+```
+
+### Combined Search and Filter (`searchText` + `filter`)
+```bash
+curl -X POST "http://localhost:3100/api/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "databaseId": "9d483ce4-2747-4ea3-a741-bc9a2bc98c4e",
+    "searchText": "access",
+    "filter": {
+      "Priority": ["P0", "P1"],
+      "Sprint": "Sprint 1",
+      "Epic": "Identity & access cleanup"
+    },
+    "pageSize": 10
   }'
 ```
 

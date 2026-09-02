@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Text search + filter API over the Notion 'Engineering Issue Tracker' database",
+  "description": "Universal search and filtering API for databases",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

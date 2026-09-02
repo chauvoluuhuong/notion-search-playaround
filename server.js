@@ -70,7 +70,6 @@ app.get('/api/options', wrap(async (req, res) => {
   });
 }));
 
-app.get('/api/search', wrap(async (req, res) => res.json(await search(req.query))));
 app.post('/api/search', wrap(async (req, res) => res.json(await search(req.body || {}))));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

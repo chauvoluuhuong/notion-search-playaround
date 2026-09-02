@@ -1,13 +1,13 @@
 {
   "info": {
-    "name": "Notion Universal Search & Filter — Generic Database Discovery",
-    "_postman_id": "notion-universal-search-v2",
-    "description": "Universal Search + Filter API for any Notion database in your workspace.\n\n### Setup\n1. Start the server: `npm start` (defaults to `http://localhost:3100`).\n2. Run `01 · Database discovery & metadata → List all discovered databases` first. Its test script automatically captures `{{databaseId}}`, `{{databaseTitle}}`, and properties.\n3. The collection is safe to run with Postman's Collection Runner.",
+    "name": "Universal Search & Filter API",
+    "_postman_id": "universal-search-api-v4",
+    "description": "Universal Search + Filter API for databases.\n\n### Setup\n1. Start the server: `npm start` (defaults to `http://localhost:3100`).\n2. Run `01 · Discovery & schema → List all discovered databases` first.\n3. The collection is safe to run with Postman Collection Runner.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "01 · Database discovery & metadata",
+      "name": "01 · Discovery & schema",
       "item": [
         {
           "name": "List all discovered databases — RUN THIS FIRST",
@@ -19,7 +19,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "databases"]
             },
-            "description": "Discovers all Notion databases accessible to the integration token. Captures `databaseId` automatically."
+            "description": "Discovers all accessible databases. Captures `databaseId` automatically."
           },
           "response": [],
           "event": [
@@ -44,7 +44,7 @@
           ]
         },
         {
-          "name": "Force refresh database discovery cache",
+          "name": "Force refresh discovery cache",
           "request": {
             "method": "GET",
             "header": [],
@@ -54,7 +54,7 @@
               "path": ["api", "databases"],
               "query": [{ "key": "refresh", "value": "1" }]
             },
-            "description": "Re-queries Notion search API immediately rather than serving from the 5-minute cache."
+            "description": "Re-queries discovery cache."
           },
           "response": [],
           "event": [
@@ -70,80 +70,7 @@
           ]
         },
         {
-          "name": "Database schema & filter capabilities (by ID)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/databases/{{databaseId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "databases", "{{databaseId}}"]
-            },
-            "description": "Returns full schema, properties, filter operators, and value choices for the specified database."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const data = pm.response.json();",
-                  "pm.test('has database and filters', () => {",
-                  "  pm.expect(data).to.have.property('database');",
-                  "  pm.expect(data).to.have.property('filters');",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Filter instructions capability document",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/filters?database_id={{databaseId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "filters"],
-              "query": [{ "key": "database_id", "value": "{{databaseId}}" }]
-            },
-            "description": "Self-describing capability document with parameters, allowed values, Notion templates, and cURL examples."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const data = pm.response.json();",
-                  "pm.test('has filters array', () => {",
-                  "  pm.expect(data.filters).to.be.an('array');",
-                  "  const priorityFilter = data.filters.find(f => f.notion_type === 'select' || f.parameter.toLowerCase() === 'priority');",
-                  "  if (priorityFilter && priorityFilter.values && priorityFilter.values[0]) {",
-                  "    pm.collectionVariables.set('priorityName', priorityFilter.values[0].name || priorityFilter.values[0].label);",
-                  "  }",
-                  "  const statusFilter = data.filters.find(f => f.notion_type === 'status' || f.parameter.toLowerCase() === 'status');",
-                  "  if (statusFilter && statusFilter.values && statusFilter.values[0]) {",
-                  "    pm.collectionVariables.set('statusName', statusFilter.values[0].name || statusFilter.values[0].label);",
-                  "  }",
-                  "  const relationFilter = data.filters.find(f => f.notion_type === 'relation');",
-                  "  if (relationFilter && relationFilter.values && relationFilter.values[0]) {",
-                  "    pm.collectionVariables.set('relationName', relationFilter.values[0].title || relationFilter.values[0].label);",
-                  "    pm.collectionVariables.set('relationId', relationFilter.values[0].id);",
-                  "  }",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Filter instructions by database ID",
+          "name": "Filter instructions by database ID (/api/filter-instructions/:id)",
           "request": {
             "method": "GET",
             "header": [],
@@ -152,7 +79,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "filter-instructions", "{{databaseId}}"]
             },
-            "description": "Returns filter capability and instruction document for the specified database ID in the path."
+            "description": "Returns simple, self-describing search capability and instruction document for AI agents."
           },
           "response": [],
           "event": [
@@ -163,9 +90,21 @@
                 "exec": [
                   "pm.test('200 OK', () => pm.response.to.have.status(200));",
                   "const data = pm.response.json();",
-                  "pm.test('has database and filters', () => {",
+                  "pm.test('has database, how_to_search, and filters', () => {",
                   "  pm.expect(data).to.have.property('database');",
+                  "  pm.expect(data).to.have.property('how_to_search');",
                   "  pm.expect(data).to.have.property('filters');",
+                  "  for (const [key, val] of Object.entries(data.filters || {})) {",
+                  "    if (key.toLowerCase() === 'priority' && val.accepted_values) {",
+                  "      pm.collectionVariables.set('priorityName', val.accepted_values[0]);",
+                  "    }",
+                  "    if (key.toLowerCase() === 'status' && val.accepted_values) {",
+                  "      pm.collectionVariables.set('statusName', val.accepted_values[0]);",
+                  "    }",
+                  "    if (key.toLowerCase() === 'epic' && val.accepted_values) {",
+                  "      pm.collectionVariables.set('relationName', val.accepted_values[0]);",
+                  "    }",
+                  "  }",
                   "});"
                 ]
               }
@@ -192,11 +131,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('has properties and options', () => {",
-                  "  const d = pm.response.json();",
-                  "  pm.expect(d).to.have.property('properties');",
-                  "});"
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
                 ]
               }
             }
@@ -212,7 +147,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "health"]
             },
-            "description": "Liveness probe. Returns `{ ok: true }`."
+            "description": "Liveness probe."
           },
           "response": [],
           "event": [
@@ -231,23 +166,24 @@
       ]
     },
     {
-      "name": "02 · Text search (q)",
+      "name": "02 · POST Search (searchText across all fields)",
       "item": [
         {
           "name": "All items — no filter",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&page_size=25",
+              "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "page_size", "value": "25" }
-              ]
+              "path": ["api", "search"]
             },
-            "description": "Returns items for the database, newest edits first."
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"pageSize\": 25\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Returns records for the database."
           },
           "response": [],
           "event": [
@@ -268,21 +204,21 @@
           ]
         },
         {
-          "name": "Free text search across default fields",
+          "name": "Free text search across all fields",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&q=access&page_size=5",
+              "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "q", "value": "access" },
-                { "key": "page_size", "value": "5" }
-              ]
+              "path": ["api", "search"]
             },
-            "description": "Case-insensitive contains across text fields, title, page body, and comments."
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"searchText\": \"access\",\n  \"pageSize\": 5\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Case-insensitive search across all text fields, page body, and comments."
           },
           "response": [],
           "event": [
@@ -298,21 +234,21 @@
           ]
         },
         {
-          "name": "Search restricted to specific fields",
+          "name": "Free text search — checklist term",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&q=checklist&fields=story,description,title,summary",
+              "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "q", "value": "checklist" },
-                { "key": "fields", "value": "story,description,title,summary" }
-              ]
+              "path": ["api", "search"]
             },
-            "description": "fields parameter restricts which fields q searches."
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"searchText\": \"checklist\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Searches for checklist across all fields."
           },
           "response": [],
           "event": [
@@ -322,96 +258,6 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('200 OK', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Search page body text (page_content)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&q=access&fields=page_content",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "q", "value": "access" },
-                { "key": "fields", "value": "page_content" }
-              ]
-            },
-            "description": "Matches in-process over the indexed page body text."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Search unresolved comments (comment)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&q=review&fields=comment",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "q", "value": "review" },
-                { "key": "fields", "value": "comment" }
-              ]
-            },
-            "description": "Searches unresolved comment threads on each page."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Term that matches nothing",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&q=zzzz-no-such-term-12345",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "q", "value": "zzzz-no-such-term-12345" }
-              ]
-            },
-            "description": "Returns empty result set, total 0, HTTP 200."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('total is 0', () => pm.expect(pm.response.json().total).to.eql(0));"
                 ]
               }
             }
@@ -420,23 +266,54 @@
       ]
     },
     {
-      "name": "03 · Dynamic property filtering",
+      "name": "03 · POST Search with structured filter",
       "item": [
         {
-          "name": "Filter by Select option",
+          "name": "Filter by single select option",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&Priority={{priorityName}}",
+              "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "Priority", "value": "{{priorityName}}" }
-              ]
+              "path": ["api", "search"]
             },
-            "description": "Filters by exact select option value."
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"filter\": {\n    \"Priority\": \"{{priorityName}}\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Filters by select option."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter with multi-value array (OR-ed)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "search"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"filter\": {\n    \"Priority\": [\"P0\", \"P1\"]\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Array of values in a filter field is OR-ed."
           },
           "response": [],
           "event": [
@@ -454,16 +331,17 @@
         {
           "name": "Filter by Status",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&Status={{statusName}}",
+              "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "Status", "value": "{{statusName}}" }
-              ]
+              "path": ["api", "search"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"filter\": {\n    \"Status\": \"{{statusName}}\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "description": "Filters by status name."
           },
@@ -481,20 +359,21 @@
           ]
         },
         {
-          "name": "Filter by Relation title (auto-resolved)",
+          "name": "Filter by Relation title",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&Epic={{relationName}}",
+              "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "Epic", "value": "{{relationName}}" }
-              ]
+              "path": ["api", "search"]
             },
-            "description": "Resolves target page title to UUID and applies relation filter."
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"filter\": {\n    \"Epic\": \"{{relationName}}\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Filters by related item title."
           },
           "response": [],
           "event": [
@@ -510,50 +389,21 @@
           ]
         },
         {
-          "name": "Filter by empty value (none)",
+          "name": "Combined searchText + filter",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&Status=none",
+              "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "Status", "value": "none" }
-              ]
+              "path": ["api", "search"]
             },
-            "description": "Passing 'none' generates `{ is_empty: true }` in Notion query."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Combined filters (Status AND Priority)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&Status={{statusName}}&Priority={{priorityName}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "Status", "value": "{{statusName}}" },
-                { "key": "Priority", "value": "{{priorityName}}" }
-              ]
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"searchText\": \"access\",\n  \"filter\": {\n    \"Status\": \"{{statusName}}\",\n    \"Priority\": \"{{priorityName}}\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
             },
-            "description": "Combines different fields with AND logic."
+            "description": "Combines free text searchText and property filters."
           },
           "response": [],
           "event": [
@@ -576,16 +426,17 @@
         {
           "name": "Page 1 — five per page",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&page_size=5",
+              "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "page_size", "value": "5" }
-              ]
+              "path": ["api", "search"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"pageSize\": 5,\n  \"offset\": 0\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "description": "Captures `nextOffset` for next page."
           },
@@ -607,17 +458,17 @@
         {
           "name": "Page 2 — offset pagination",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&page_size=5&offset={{nextOffset}}",
+              "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "page_size", "value": "5" },
-                { "key": "offset", "value": "{{nextOffset}}" }
-              ]
+              "path": ["api", "search"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"databaseId\": \"{{databaseId}}\",\n  \"pageSize\": 5,\n  \"offset\": {{nextOffset}}\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "description": "Fetches page 2 using offset."
           },
@@ -633,167 +484,28 @@
               }
             }
           ]
-        },
-        {
-          "name": "Maximum page size clamping",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&page_size=500",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "page_size", "value": "500" }
-              ]
-            },
-            "description": "Page sizes above 100 are automatically clamped."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
         }
       ]
     },
     {
-      "name": "05 · POST (JSON body)",
+      "name": "05 · Edge cases",
       "item": [
         {
-          "name": "POST — dynamic filters as JSON",
+          "name": "Empty body returns all items",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
               "raw": "{{baseUrl}}/api/search",
               "host": ["{{baseUrl}}"],
               "path": ["api", "search"]
             },
-            "description": "POST search with JSON body.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"database_id\": \"{{databaseId}}\",\n  \"q\": \"access\",\n  \"page_size\": 5\n}",
-              "options": { "raw": { "language": "json" } }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST — multi-value array filters",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/search",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "search"]
-            },
-            "description": "Passing arrays for parameters applies OR logic across values.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"database_id\": \"{{databaseId}}\",\n  \"Priority\": [\"P0\", \"P1\"],\n  \"page_size\": 5\n}",
-              "options": { "raw": { "language": "json" } }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST — empty body returns default database items",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/search",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "search"]
-            },
-            "description": "Empty body queries without filter.",
             "body": {
               "mode": "raw",
               "raw": "{}",
               "options": { "raw": { "language": "json" } }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "06 · Edge cases",
-      "item": [
-        {
-          "name": "Unknown field names in fields parameter are ignored",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/search?database_id={{databaseId}}&q=test&fields=bogus_field,story,title",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "search"],
-              "query": [
-                { "key": "database_id", "value": "{{databaseId}}" },
-                { "key": "q", "value": "test" },
-                { "key": "fields", "value": "bogus_field,story,title" }
-              ]
             },
-            "description": "Unrecognized fields are ignored; valid ones apply."
+            "description": "Empty body defaults cleanly."
           },
           "response": [],
           "event": [

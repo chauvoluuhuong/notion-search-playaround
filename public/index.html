@@ -323,41 +323,23 @@
     border-radius: var(--radius-sm);
     background: var(--bg);
     color: var(--ink);
+  .grid input[type=text],
+  .grid input[type=date] {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--ink);
     font: inherit;
-  }
-
-  /* Search Fields Toggles */
-  .fields-section {
-    margin-top: 18px;
-    padding-top: 16px;
-    border-top: 1px solid var(--line);
-  }
-  .fieldlist {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .fieldlist label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--chip);
-    border: 1px solid transparent;
-    border-radius: 999px;
-    padding: 5px 12px;
-    font-size: 13px;
-    cursor: pointer;
+    font-size: 13.5px;
     transition: var(--transition);
-    user-select: none;
   }
-  .fieldlist label:hover {
-    background: var(--chip-hover);
-  }
-  .fieldlist label:has(input:checked) {
-    background: var(--accent-soft);
-    border-color: var(--accent-border);
-    color: var(--accent);
-    font-weight: 500;
+  .grid input[type=text]:focus,
+  .grid input[type=date]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
   }
 
   /* Active Filter Chips */
@@ -437,7 +419,7 @@
   .meta-bar {
     color: var(--muted);
     font-size: 13.5px;
-    margin: 24px 0 12px;
+    margin: 24px 0 14px;
     display: flex;
     gap: 12px;
     align-items: center;
@@ -453,136 +435,255 @@
   .results-grid {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
   }
   .card {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 16px 20px;
+    padding: 18px 22px;
     box-shadow: var(--shadow-sm);
     transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
   .card:hover {
-    border-color: var(--line-focus);
+    border-color: var(--accent-border);
     box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
   }
   .card-header {
     display: flex;
-    align-items: baseline;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 8px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .card-title-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: 1;
+    min-width: 260px;
+  }
+  .card-title-icon {
+    font-size: 18px;
+    line-height: 1;
   }
   .card h3 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.4;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
   }
   .card h3 a {
-    color: inherit;
+    color: var(--ink);
     text-decoration: none;
+    transition: var(--transition);
   }
   .card h3 a:hover {
     color: var(--accent);
     text-decoration: underline;
   }
+  .card-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
   .card-time {
     font-size: 12px;
     color: var(--muted);
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
 
-  /* Property rows & tags */
-  .props-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    margin-top: 10px;
+  /* Separated Key-Value Fields Grid */
+  .fields-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 10px;
+    margin-top: 4px;
   }
+  .field-box {
+    background: var(--panel-sub);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: var(--transition);
+  }
+  .field-box:hover {
+    border-color: var(--accent-border);
+  }
+  .field-name {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .field-val {
+    font-size: 13.5px;
+    color: var(--ink);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 24px;
+  }
+
   .prop-pill {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    background: var(--chip);
+    gap: 6px;
+    border: 1px solid transparent;
     border-radius: 6px;
-    padding: 3px 9px;
+    padding: 2px 8px;
     font-size: 12px;
-    color: var(--ink);
-  }
-  .prop-pill span.pname {
-    color: var(--muted);
-    font-weight: 500;
-  }
-  .prop-pill span.pval {
     font-weight: 600;
   }
 
   /* Notion colors */
-  .pill-gray { background: #e5e7eb; color: #374151; }
-  .pill-blue { background: #dbeafe; color: #1e40af; }
-  .pill-green { background: #dcfce7; color: #166534; }
-  .pill-yellow { background: #fef9c3; color: #854d0e; }
-  .pill-orange { background: #ffedd5; color: #9a3412; }
-  .pill-red { background: #fee2e2; color: #991b1b; }
-  .pill-purple { background: #f3e8ff; color: #6b21a8; }
-  .pill-pink { background: #fce7f3; color: #9d174d; }
+  .pill-gray { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
+  .pill-blue { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+  .pill-green { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+  .pill-yellow { background: #fefce8; color: #854d0e; border-color: #fef08a; }
+  .pill-orange { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
+  .pill-red { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+  .pill-purple { background: #faf5ff; color: #6b21a8; border-color: #e9d5ff; }
+  .pill-pink { background: #fdf2f8; color: #9d174d; border-color: #fbcfe8; }
 
   @media (prefers-color-scheme: dark) {
-    .pill-gray { background: #374151; color: #e5e7eb; }
-    .pill-blue { background: #1e3a8a; color: #bfdbfe; }
-    .pill-green { background: #14532d; color: #bbf7d0; }
-    .pill-yellow { background: #713f12; color: #fef08a; }
-    .pill-orange { background: #7c2d12; color: #fed7aa; }
-    .pill-red { background: #7f1d1d; color: #fecaca; }
-    .pill-purple { background: #581c87; color: #e9d5ff; }
-    .pill-pink { background: #831843; color: #fbcfe8; }
+    .pill-gray { background: #1f2937; color: #e5e7eb; border-color: #374151; }
+    .pill-blue { background: #172554; color: #bfdbfe; border-color: #1e3a8a; }
+    .pill-green { background: #052e16; color: #bbf7d0; border-color: #14532d; }
+    .pill-yellow { background: #422006; color: #fef08a; border-color: #713f12; }
+    .pill-orange { background: #431407; color: #fed7aa; border-color: #7c2d12; }
+    .pill-red { background: #450a0a; color: #fecaca; border-color: #7f1d1d; }
+    .pill-purple { background: #3b0764; color: #e9d5ff; border-color: #581c87; }
+    .pill-pink { background: #500724; color: #fbcfe8; border-color: #831843; }
   }
 
-  .text-row {
-    font-size: 13.5px;
-    color: var(--muted);
-    margin: 6px 0;
-    line-height: 1.45;
+  /* Search match highlights */
+  .match-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+    flex-wrap: wrap;
   }
-  .text-row b {
-    color: var(--ink);
+  .match-tag {
+    background: var(--panel);
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 11px;
     font-weight: 600;
   }
+
+  /* Content sections */
+  .card-section {
+    background: var(--panel-sub);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .card-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Comments */
+  .comments-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .comment-item {
+    background: var(--panel-sub);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .comment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+  .comment-author {
+    font-weight: 600;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .comment-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+  .comment-tag-inline {
+    font-size: 10.5px;
+    padding: 1px 5px;
+    background: var(--chip);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--muted);
+  }
+  .comment-time {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .comment-body {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.45;
+  }
+
   mark {
     background: var(--mark);
     color: inherit;
     border-radius: 3px;
     padding: 0 3px;
-  }
-
-  .cmt-box {
-    font-size: 13px;
-    color: var(--muted);
-    margin: 8px 0 0;
-    padding: 6px 12px;
-    background: var(--panel-sub);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  }
-  .cmt-box .who { color: var(--ink); font-weight: 600; }
-  .cmt-box .when { opacity: 0.75; font-size: 11.5px; }
-
-  .match-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 10px;
-  }
-  .match-tag {
-    background: var(--accent-soft);
-    color: var(--accent);
-    border: 1px solid var(--accent-border);
-    border-radius: 999px;
-    padding: 2px 9px;
-    font-size: 11px;
     font-weight: 600;
   }
 
@@ -653,8 +754,7 @@
       </h1>
       <div class="header-links">
         <a href="/api/databases" target="_blank">📡 /api/databases</a>
-        <a href="/api/filters" id="api-filters-link" target="_blank">📋 /api/filters</a>
-        <a href="https://developers.notion.com" target="_blank" rel="noreferrer">Notion API Docs ↗</a>
+        <a href="/api/filter-instructions" id="api-filters-link" target="_blank">📋 /api/filter-instructions</a>
       </div>
     </div>
   </header>
@@ -663,8 +763,8 @@
   <div class="db-bar">
     <span class="db-label">Database</span>
     <div class="db-select-wrap">
-      <select id="db-select" class="db-select" title="Select a Notion Database"></select>
-      <button type="button" id="btn-refresh" class="btn-refresh" title="Refresh databases and schema from Notion">
+      <select id="db-select" class="db-select" title="Select a Database"></select>
+      <button type="button" id="btn-refresh" class="btn-refresh" title="Refresh database discovery">
         🔄 Refresh
       </button>
     </div>
@@ -673,21 +773,12 @@
 
   <form class="panel" id="form">
     <div class="searchrow">
-      <input type="search" id="q" name="q" placeholder="Free text search across active database fields, page body & comments..." autocomplete="off">
+      <input type="search" id="q" name="q" placeholder="Free text search across all fields, page body & comments..." autocomplete="off">
       <button class="primary" type="submit">Search</button>
     </div>
 
     <!-- Dynamically rendered filter controls -->
     <div class="grid" id="filters-grid"></div>
-
-    <!-- Search fields selector -->
-    <div class="fields-section">
-      <div class="lblrow">
-        <label class="lbl">Search in text fields</label>
-        <button type="button" class="clearbtn" id="btn-reset-fields" hidden>reset to all</button>
-      </div>
-      <div class="fieldlist" id="fieldlist"></div>
-    </div>
 
     <!-- Active filter chips -->
     <div class="active-bar" id="active-bar"></div>
@@ -711,7 +802,7 @@
   </div>
 
   <details class="debug" id="debugwrap" hidden>
-    <summary>Query Execution & Notion Filter Details</summary>
+    <summary>Query Execution & Filter Details</summary>
     <pre id="debug"></pre>
   </details>
 </div>
@@ -795,7 +886,7 @@ async function loadDatabases(refresh = false) {
 
 async function switchDatabase(databaseId, refresh = false) {
   $('#meta-count').innerHTML = '<span class="loading-spinner"></span> Discovering schema & capabilities…';
-  $('#api-filters-link').href = `/api/filters?database_id=${databaseId}`;
+  $('#api-filters-link').href = `/api/filter-instructions/${databaseId}`;
 
   const currentDb = DATABASES.find((d) => d.id === databaseId);
   if (currentDb) {
@@ -808,14 +899,14 @@ async function switchDatabase(databaseId, refresh = false) {
   try {
     const [optionsRes, filtersRes] = await Promise.all([
       fetch(`/api/options?database_id=${databaseId}${refresh ? '&refresh=1' : ''}`).then((r) => r.json()),
-      fetch(`/api/filters?database_id=${databaseId}${refresh ? '&refresh=1' : ''}`).then((r) => r.json()),
+      fetch(`/api/filter-instructions/${databaseId}${refresh ? '&refresh=1' : ''}`).then((r) => r.json()),
     ]);
 
     ACTIVE_SCHEMA = optionsRes;
     ACTIVE_FILTER_DOC = filtersRes;
     LABELS = {};
 
-    renderDynamicControls(optionsRes, filtersRes);
+    renderDynamicControls(optionsRes);
     syncControls();
     runSearch();
   } catch (err) {
@@ -826,105 +917,112 @@ async function switchDatabase(databaseId, refresh = false) {
 
 // ---------- Dynamic Control Rendering ----------
 
-function renderDynamicControls(schema, filterDoc) {
+function renderDynamicControls(schema) {
   const grid = $('#filters-grid');
   grid.innerHTML = '';
 
-  const filters = filterDoc.filters || [];
-  for (const f of filters) {
+  const properties = schema.properties || [];
+  for (const p of properties) {
+    // Skip raw free-text properties from filter dropdowns since searchText searches across all fields
+    if (p.type === 'title' || p.type === 'rich_text') continue;
+
+    const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     const col = el('div', 'filter-col');
     const lblRow = el('div', 'lblrow');
     const lbl = el('label', 'lbl');
-    lbl.textContent = f.parameter;
-    lbl.setAttribute('for', 'filter-' + f.field);
+    lbl.textContent = p.name;
+    lbl.setAttribute('for', 'filter-' + slug);
 
-    const typeTag = el('span', 'type-tag', f.notion_type);
+    const typeTag = el('span', 'type-tag', p.type);
     lbl.appendChild(typeTag);
 
     const clearBtn = el('button', 'clearbtn', 'clear');
     clearBtn.type = 'button';
-    clearBtn.dataset.clear = f.field;
+    clearBtn.dataset.clear = slug;
     clearBtn.hidden = true;
-    clearBtn.onclick = () => clearOne(f.field);
+    clearBtn.onclick = () => clearOne(slug);
 
     lblRow.append(lbl, clearBtn);
     col.appendChild(lblRow);
 
-    LABELS[f.field] = {};
+    LABELS[slug] = {};
 
-    if (f.notion_type === 'select' || f.notion_type === 'multi_select' || f.notion_type === 'status') {
+    if (p.type === 'select' || p.type === 'multi_select' || p.type === 'status') {
       const sel = el('select');
-      sel.id = 'filter-' + f.field;
+      sel.id = 'filter-' + slug;
       sel.multiple = true;
-      sel.dataset.field = f.field;
-      sel.dataset.notionProperty = f.notion_property;
+      sel.dataset.field = p.name;
+      sel.dataset.slug = slug;
 
       const noneOpt = new Option('— Empty / None —', 'none');
       sel.appendChild(noneOpt);
-      LABELS[f.field]['none'] = 'Empty / None';
+      LABELS[slug]['none'] = 'Empty / None';
 
-      for (const val of f.values || []) {
+      const options = p.options || schema.options_by_property?.[p.name] || [];
+      for (const val of options) {
         const countTxt = val.count ? ` (${val.count})` : '';
         const opt = new Option(`${val.name}${countTxt}`, val.name);
         sel.appendChild(opt);
-        LABELS[f.field][val.name] = val.name;
+        LABELS[slug][val.name] = val.name;
       }
       sel.onchange = () => { syncControls(); runSearch(); };
       col.appendChild(sel);
-    } else if (f.notion_type === 'people') {
+    } else if (p.type === 'people') {
       const sel = el('select');
-      sel.id = 'filter-' + f.field;
+      sel.id = 'filter-' + slug;
       sel.multiple = true;
-      sel.dataset.field = f.field;
-      sel.dataset.notionProperty = f.notion_property;
+      sel.dataset.field = p.name;
+      sel.dataset.slug = slug;
 
       const noneOpt = new Option('— Unassigned —', 'none');
       sel.appendChild(noneOpt);
-      LABELS[f.field]['none'] = 'Unassigned';
+      LABELS[slug]['none'] = 'Unassigned';
 
-      for (const u of f.values || []) {
+      const users = p.users || schema.people_by_property?.[p.name] || [];
+      for (const u of users) {
         const countTxt = u.count ? ` (${u.count})` : '';
-        const opt = new Option(`${u.label}${countTxt}`, u.id);
+        const opt = new Option(`${u.label || u.name}${countTxt}`, u.name || u.label || u.id);
         sel.appendChild(opt);
-        LABELS[f.field][u.id] = u.label;
+        LABELS[slug][u.name || u.label || u.id] = u.label || u.name;
       }
       sel.onchange = () => { syncControls(); runSearch(); };
       col.appendChild(sel);
-    } else if (f.notion_type === 'relation') {
+    } else if (p.type === 'relation') {
       const sel = el('select');
-      sel.id = 'filter-' + f.field;
+      sel.id = 'filter-' + slug;
       sel.multiple = true;
-      sel.dataset.field = f.field;
-      sel.dataset.notionProperty = f.notion_property;
+      sel.dataset.field = p.name;
+      sel.dataset.slug = slug;
 
       const noneOpt = new Option('— No relation —', 'none');
       sel.appendChild(noneOpt);
-      LABELS[f.field]['none'] = 'No relation';
+      LABELS[slug]['none'] = 'No relation';
 
-      for (const t of f.values || []) {
+      const targets = p.targets || schema.relations_by_property?.[p.name] || [];
+      for (const t of targets) {
         const countTxt = t.count ? ` (${t.count})` : '';
-        const opt = new Option(`${t.label}${countTxt}`, t.id);
+        const opt = new Option(`${t.label || t.title}${countTxt}`, t.title || t.label || t.id);
         sel.appendChild(opt);
-        LABELS[f.field][t.id] = t.label;
+        LABELS[slug][t.title || t.label || t.id] = t.label || t.title;
       }
       sel.onchange = () => { syncControls(); runSearch(); };
       col.appendChild(sel);
-    } else if (f.notion_type === 'checkbox') {
+    } else if (p.type === 'checkbox') {
       const sel = el('select');
-      sel.id = 'filter-' + f.field;
-      sel.dataset.field = f.field;
-      sel.dataset.notionProperty = f.notion_property;
+      sel.id = 'filter-' + slug;
+      sel.dataset.field = p.name;
+      sel.dataset.slug = slug;
       sel.appendChild(new Option('All', ''));
       sel.appendChild(new Option('Checked (True)', 'true'));
       sel.appendChild(new Option('Unchecked (False)', 'false'));
-      LABELS[f.field]['true'] = 'Checked';
-      LABELS[f.field]['false'] = 'Unchecked';
+      LABELS[slug]['true'] = 'Checked';
+      LABELS[slug]['false'] = 'Unchecked';
       sel.onchange = () => { syncControls(); runSearch(); };
       col.appendChild(sel);
-    } else if (f.notion_type === 'number') {
+    } else if (p.type === 'number') {
       const wrap = el('div', 'number-filter-wrap');
       const opSel = el('select');
-      opSel.id = 'filter-op-' + f.field;
+      opSel.id = 'filter-op-' + slug;
       opSel.appendChild(new Option('=', ''));
       opSel.appendChild(new Option('>=', '>='));
       opSel.appendChild(new Option('<=', '<='));
@@ -934,41 +1032,41 @@ function renderDynamicControls(schema, filterDoc) {
 
       const numInput = el('input');
       numInput.type = 'number';
-      numInput.id = 'filter-' + f.field;
-      numInput.dataset.field = f.field;
-      numInput.dataset.notionProperty = f.notion_property;
-      numInput.placeholder = f.format || '0';
+      numInput.id = 'filter-' + slug;
+      numInput.dataset.field = p.name;
+      numInput.dataset.slug = slug;
+      numInput.placeholder = p.format || '0';
 
       opSel.onchange = () => { syncControls(); runSearch(); };
       numInput.oninput = () => { syncControls(); runSearch(); };
       wrap.append(opSel, numInput);
       col.appendChild(wrap);
+    } else if (p.type === 'date') {
+      const sel = el('select');
+      sel.id = 'filter-' + slug;
+      sel.dataset.field = p.name;
+      sel.dataset.slug = slug;
+      sel.appendChild(new Option('All dates', ''));
+      sel.appendChild(new Option('Past week', 'past_week'));
+      sel.appendChild(new Option('This week', 'this_week'));
+      sel.appendChild(new Option('Next week', 'next_week'));
+      sel.appendChild(new Option('Past month', 'past_month'));
+      LABELS[slug]['past_week'] = 'Past week';
+      LABELS[slug]['this_week'] = 'This week';
+      LABELS[slug]['next_week'] = 'Next week';
+      LABELS[slug]['past_month'] = 'Past month';
+      sel.onchange = () => { syncControls(); runSearch(); };
+      col.appendChild(sel);
     }
 
     grid.appendChild(col);
-  }
-
-  // Render text search fields list
-  const fieldlist = $('#fieldlist');
-  fieldlist.innerHTML = '';
-  const textFields = filterDoc.text_search?.fields || [];
-  for (const tf of textFields) {
-    const lab = el('label');
-    const cb = el('input');
-    cb.type = 'checkbox';
-    cb.value = tf.key;
-    cb.checked = tf.searched_by_default !== false;
-    cb.onchange = () => { syncControls(); runSearch(); };
-    lab.append(cb, document.createTextNode(tf.label));
-    lab.title = `${tf.notion_property || 'virtual'} · ${tf.notion_type}`;
-    fieldlist.appendChild(lab);
   }
 }
 
 // ---------- Filter Helpers ----------
 
-const pickedValues = (field) => {
-  const el = $('#filter-' + field);
+const pickedValues = (slug) => {
+  const el = $('#filter-' + slug);
   if (!el) return [];
   if (el.tagName === 'SELECT' && el.multiple) {
     return [...el.selectedOptions].map((o) => o.value);
@@ -979,26 +1077,14 @@ const pickedValues = (field) => {
   if (el.tagName === 'INPUT' && el.type === 'number') {
     const val = el.value.trim();
     if (!val) return [];
-    const op = $('#filter-op-' + field)?.value || '';
+    const op = $('#filter-op-' + slug)?.value || '';
     return [op + val];
   }
   return el.value ? [el.value.trim()] : [];
 };
 
-const checkedFields = () =>
-  [...$('#fieldlist').querySelectorAll('input:checked')].map((c) => c.value);
-
-const allFields = () =>
-  [...$('#fieldlist').querySelectorAll('input')].map((c) => c.value);
-
-const fieldsAreDefault = () => {
-  const now = checkedFields().sort().join();
-  const all = allFields().sort().join();
-  return now === all;
-};
-
-function clearOne(field) {
-  const el = $('#filter-' + field);
+function clearOne(slug) {
+  const el = $('#filter-' + slug);
   if (!el) return;
   if (el.tagName === 'SELECT' && el.multiple) {
     for (const o of el.options) o.selected = false;
@@ -1011,8 +1097,8 @@ function clearOne(field) {
   runSearch();
 }
 
-function clearValue(field, value) {
-  const el = $('#filter-' + field);
+function clearValue(slug, value) {
+  const el = $('#filter-' + slug);
   if (!el) return;
   if (el.tagName === 'SELECT' && el.multiple) {
     for (const o of el.options) {
@@ -1027,57 +1113,40 @@ function clearValue(field, value) {
 
 function clearAll() {
   $('#q').value = '';
-  for (const f of ACTIVE_FILTER_DOC?.filters || []) {
-    clearOne(f.field);
-  }
-  for (const cb of $('#fieldlist').querySelectorAll('input')) {
-    cb.checked = true;
+  for (const p of ACTIVE_SCHEMA?.properties || []) {
+    const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    clearOne(slug);
   }
   syncControls();
   runSearch();
 }
 
 function syncControls() {
-  const filters = ACTIVE_FILTER_DOC?.filters || [];
-  for (const f of filters) {
-    const vals = pickedValues(f.field);
-    const clearBtn = $(`.clearbtn[data-clear="${f.field}"]`);
+  const properties = ACTIVE_SCHEMA?.properties || [];
+  for (const p of properties) {
+    const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const vals = pickedValues(slug);
+    const clearBtn = $(`.clearbtn[data-clear="${slug}"]`);
     if (clearBtn) clearBtn.hidden = vals.length === 0;
   }
-
-  $('#btn-reset-fields').hidden = fieldsAreDefault();
 
   const bar = $('#active-bar');
   bar.innerHTML = '';
   const chips = [];
 
   const q = $('#q').value.trim();
-  if (q) chips.push({ field: 'q', k: 'Search', label: `"${q}"`, onclear: () => { $('#q').value = ''; syncControls(); runSearch(); } });
+  if (q) chips.push({ k: 'Search', label: `"${q}"`, onclear: () => { $('#q').value = ''; syncControls(); runSearch(); } });
 
-  for (const f of filters) {
-    for (const v of pickedValues(f.field)) {
-      const label = LABELS[f.field]?.[v] || v;
+  for (const p of properties) {
+    const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    for (const v of pickedValues(slug)) {
+      const label = LABELS[slug]?.[v] || v;
       chips.push({
-        field: f.field,
-        k: f.parameter,
+        k: p.name,
         label,
-        onclear: () => clearValue(f.field, v),
+        onclear: () => clearValue(slug, v),
       });
     }
-  }
-
-  if (!fieldsAreDefault()) {
-    const sel = checkedFields();
-    chips.push({
-      field: 'fields',
-      k: 'Fields',
-      label: sel.length ? sel.join(', ') : 'none',
-      onclear: () => {
-        for (const cb of $('#fieldlist').querySelectorAll('input')) cb.checked = true;
-        syncControls();
-        runSearch();
-      },
-    });
   }
 
   if (!chips.length) return;
@@ -1102,49 +1171,53 @@ function syncControls() {
 
 // ---------- Search Execution ----------
 
-function collectParams() {
-  const p = new URLSearchParams();
-  if (ACTIVE_DB_ID) p.set('database_id', ACTIVE_DB_ID);
-
+function collectRequestBody(offset = 0) {
+  const body = {
+    databaseId: ACTIVE_DB_ID,
+    pageSize: PAGE_SIZE,
+    offset,
+  };
   const q = $('#q').value.trim();
-  if (q) p.set('q', q);
+  if (q) body.searchText = q;
 
-  if (!fieldsAreDefault()) {
-    p.set('fields', checkedFields().join(','));
-  }
-
-  for (const f of ACTIVE_FILTER_DOC?.filters || []) {
-    const vals = pickedValues(f.field);
+  const filter = {};
+  for (const p of ACTIVE_SCHEMA?.properties || []) {
+    const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const vals = pickedValues(slug);
     if (vals.length) {
-      p.set(f.parameter, vals.join(','));
+      filter[p.name] = vals.length === 1 ? vals[0] : vals;
     }
   }
-  p.set('page_size', String(PAGE_SIZE));
-  return p;
+  if (Object.keys(filter).length > 0) {
+    body.filter = filter;
+  }
+  return body;
 }
 
-async function runSearch(startOffset = 0, params = null) {
+async function runSearch(startOffset = 0) {
   const token = ++SEARCH_TOKEN;
-  const base = params ?? collectParams();
   const box = $('#results');
   if (startOffset === 0) box.innerHTML = '';
   $('#morewrap').hidden = true;
 
   let offset = startOffset;
   let shown = box.querySelectorAll('.card').length;
-  const q = base.get('q') || '';
+  const q = $('#q').value.trim();
 
   while (true) {
     $('#meta-count').innerHTML = shown
       ? `<span class="loading-spinner"></span> Loaded ${shown} results…`
-      : '<span class="loading-spinner"></span> Searching Notion…';
+      : '<span class="loading-spinner"></span> Searching…';
 
-    const p = new URLSearchParams(base);
-    if (offset) p.set('offset', String(offset));
+    const body = collectRequestBody(offset);
 
     let data;
     try {
-      const res = await fetch('/api/search?' + p);
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
       data = await res.json();
       if (!res.ok) throw new Error(data.error || res.statusText);
     } catch (e) {
@@ -1162,9 +1235,9 @@ async function runSearch(startOffset = 0, params = null) {
     shown += (data.results || []).length;
     offset += (data.results || []).length;
 
-    $('#debugwrap').hidden = !data.notion_filter && !data.text_matching;
+    $('#debugwrap').hidden = !data.filter_applied && !data.text_matching;
     $('#debug').textContent = JSON.stringify(
-      { database: data.database, notion_filter: data.notion_filter, text_matching: data.text_matching },
+      { database: data.database, filter_applied: data.filter_applied, text_matching: data.text_matching },
       null,
       2,
     );
@@ -1186,7 +1259,7 @@ async function runSearch(startOffset = 0, params = null) {
       $('#meta-count').textContent = `${data.total} results — showing ${shown}`;
       const moreBtn = $('#btn-load-more');
       moreBtn.textContent = `Load the remaining ${data.total - shown}`;
-      moreBtn.onclick = () => runSearch(offset, base);
+      moreBtn.onclick = () => runSearch(offset);
       $('#morewrap').hidden = false;
       return;
     }
@@ -1195,79 +1268,152 @@ async function runSearch(startOffset = 0, params = null) {
 
 // ---------- Result Card Rendering ----------
 
+// ---------- Result Card Rendering ----------
+
+function getPropertyIcon(pname, pval) {
+  const n = pname.toLowerCase();
+  if (n.includes('status')) return '🎯';
+  if (n.includes('priority')) return '⚡';
+  if (n.includes('assignee') || n.includes('owner') || n.includes('user') || n.includes('author') || n.includes('people')) return '👤';
+  if (n.includes('epic') || n.includes('relation') || n.includes('parent') || n.includes('link')) return '🔗';
+  if (n.includes('date') || n.includes('due') || n.includes('start') || n.includes('end') || n.includes('created') || n.includes('edited')) return '📅';
+  if (n.includes('sprint') || n.includes('iteration')) return '🏃';
+  if (n.includes('estimate') || n.includes('point') || n.includes('cost') || n.includes('number') || typeof pval === 'number') return '🔢';
+  if (typeof pval === 'boolean') return '☑️';
+  return '🏷️';
+}
+
 function renderCard(r, q) {
   const card = el('div', 'card');
-  const header = el('div', 'card-header');
-  const h3 = el('h3');
-  h3.innerHTML = `<a href="${esc(r.url)}" target="_blank" rel="noreferrer">${highlight(r.title || 'Untitled', q)}</a>`;
 
-  header.append(h3);
+  // Header row: Title + Last Updated Time
+  const header = el('div', 'card-header');
+  const titleWrap = el('div', 'card-title-wrap');
+  
+  const iconSpan = el('span', 'card-title-icon', '📄');
+  const h3 = el('h3');
+  h3.innerHTML = `<a href="${esc(r.url)}" target="_blank" rel="noreferrer">${highlight(r.title || 'Untitled', q)} <span style="font-size: 13px; opacity: 0.6;">↗</span></a>`;
+  titleWrap.append(iconSpan, h3);
+  header.append(titleWrap);
+
+  const metaRight = el('div', 'card-meta-right');
   if (r.last_edited_time) {
-    const time = el('span', 'card-time', 'Updated ' + r.last_edited_time.slice(0, 10));
-    header.append(time);
+    const time = el('span', 'card-time');
+    time.innerHTML = `<span>🕒</span> Updated ${esc(r.last_edited_time.slice(0, 10))}`;
+    metaRight.append(time);
   }
+  header.append(metaRight);
   card.append(header);
 
-  // Property tags row
-  const propsRow = el('div', 'props-row');
+  // Search match indicators banner
+  if (r.matched_fields && r.matched_fields.length > 0) {
+    const banner = el('div', 'match-banner');
+    banner.append(document.createTextNode('🎯 Matched in:'));
+    for (const m of r.matched_fields) {
+      const label = m === 'comment' ? '💬 Comments' : (m === 'page_content' ? '📄 Page Content' : m);
+      banner.append(el('span', 'match-tag', label));
+    }
+    card.append(banner);
+  }
+
+  // Separated Key-Value Fields Grid
+  const fieldsGrid = el('div', 'fields-grid');
+  let hasFields = false;
+
   for (const [pname, pval] of Object.entries(r.properties || {})) {
     if (pval == null || pval === '' || (Array.isArray(pval) && !pval.length)) continue;
     if (pname === ACTIVE_SCHEMA?.title_property) continue;
+    if (typeof pval === 'string' && (pval.length >= 60 || pval.includes('\n'))) continue;
+
+    hasFields = true;
+    const box = el('div', 'field-box');
+    const nameDiv = el('div', 'field-name');
+    const icon = getPropertyIcon(pname, pval);
+    nameDiv.innerHTML = `<span>${icon}</span> ${esc(pname)}`;
+    box.appendChild(nameDiv);
+
+    const valDiv = el('div', 'field-val');
 
     if (typeof pval === 'object' && pval.name && pval.color) {
-      const pill = el('span', `prop-pill pill-${pval.color}`);
-      pill.innerHTML = `<span class="pname">${esc(pname)}:</span> <span class="pval">${esc(pval.name)}</span>`;
-      propsRow.append(pill);
+      valDiv.innerHTML = `<span class="prop-pill pill-${pval.color}">${highlight(pval.name, q)}</span>`;
     } else if (Array.isArray(pval) && pval.length && pval[0]?.label) {
-      const pill = el('span', 'prop-pill');
-      const labels = pval.map((x) => esc(x.label)).join(', ');
-      pill.innerHTML = `<span class="pname">${esc(pname)}:</span> <span class="pval">${labels}</span>`;
-      propsRow.append(pill);
-    } else if (typeof pval === 'number' || typeof pval === 'boolean') {
-      const pill = el('span', 'prop-pill');
-      pill.innerHTML = `<span class="pname">${esc(pname)}:</span> <span class="pval">${String(pval)}</span>`;
-      propsRow.append(pill);
-    } else if (typeof pval === 'string' && pval.length < 50 && !pval.includes('\n')) {
-      const pill = el('span', 'prop-pill');
-      pill.innerHTML = `<span class="pname">${esc(pname)}:</span> <span class="pval">${highlight(pval, q)}</span>`;
-      propsRow.append(pill);
+      valDiv.innerHTML = pval.map((x) => highlight(x.label, q)).join(', ');
+    } else if (Array.isArray(pval)) {
+      valDiv.innerHTML = pval.map((x) => {
+        if (typeof x === 'object' && x?.name && x?.color) {
+          return `<span class="prop-pill pill-${x.color}">${highlight(x.name, q)}</span>`;
+        }
+        return highlight(typeof x === 'object' ? (x?.name || x?.label || JSON.stringify(x)) : String(x), q);
+      }).join(' ');
+    } else if (typeof pval === 'number') {
+      valDiv.innerHTML = `<b>${String(pval)}</b>`;
+    } else if (typeof pval === 'boolean') {
+      valDiv.innerHTML = pval ? '✓ Yes' : '✗ No';
+    } else if (typeof pval === 'string') {
+      valDiv.innerHTML = highlight(pval, q);
+    } else {
+      valDiv.innerHTML = highlight(JSON.stringify(pval), q);
     }
-  }
-  if (propsRow.childNodes.length) card.append(propsRow);
 
-  // Text content / descriptions
+    box.appendChild(valDiv);
+    fieldsGrid.appendChild(box);
+  }
+
+  if (hasFields) {
+    card.append(fieldsGrid);
+  }
+
+  // Descriptions & Long text sections
   for (const [pname, pval] of Object.entries(r.properties || {})) {
-    if (typeof pval === 'string' && (pval.length >= 50 || pval.includes('\n'))) {
-      const textRow = el('div', 'text-row');
-      textRow.innerHTML = `<b>${esc(pname)}:</b> ${highlight(pval, q)}`;
-      card.append(textRow);
+    if (typeof pval === 'string' && (pval.length >= 60 || pval.includes('\n'))) {
+      const sec = el('div', 'card-section');
+      sec.innerHTML = `<div class="card-section-title">📝 ${esc(pname)}</div><div>${highlight(pval, q)}</div>`;
+      card.append(sec);
     }
   }
 
-  // Page body snippet
+  // Page body snippet section
   if (r.page_content) {
-    const bodyRow = el('div', 'text-row');
-    bodyRow.innerHTML = `<b>Page Content:</b> ${highlight(r.page_content, q)}`;
-    card.append(bodyRow);
+    const sec = el('div', 'card-section');
+    sec.innerHTML = `<div class="card-section-title">📄 Page Content Excerpt</div><div>${highlight(r.page_content, q)}</div>`;
+    card.append(sec);
   }
 
-  // Comments
-  for (const cm of r.comments || []) {
-    const box = el('div', 'cmt-box');
-    const who = cm.author ? esc(cm.author) : 'Comment';
-    const when = cm.created_time ? ` <span class="when">· ${esc(cm.created_time.slice(0, 10))}</span>` : '';
-    const inlineTag = cm.inline ? ' <span class="when">· inline</span>' : '';
-    box.innerHTML = `<span class="who">💬 ${who}</span>${when}${inlineTag}<br>${highlight(cm.excerpt || cm.text, q)}`;
-    card.append(box);
-  }
+  // Comments section
+  if (r.comments && r.comments.length > 0) {
+    const cmtWrap = el('div', 'comments-wrap');
+    const cmtHeader = el('div', 'card-section-title');
+    cmtHeader.innerHTML = `💬 Comments (${r.comment_count || r.comments.length})`;
+    cmtWrap.append(cmtHeader);
 
-  // Matched fields tags
-  if (r.matched_fields && r.matched_fields.length) {
-    const matchTags = el('div', 'match-tags');
-    for (const m of r.matched_fields) {
-      matchTags.append(el('span', 'match-tag', `matched: ${m}`));
+    for (const cm of r.comments) {
+      const cItem = el('div', 'comment-item');
+      const cHeader = el('div', 'comment-header');
+      const authorWrap = el('div', 'comment-author');
+      
+      const authorName = cm.author || 'Author';
+      const initial = authorName.charAt(0).toUpperCase();
+      const avatar = el('span', 'comment-avatar', initial);
+      authorWrap.append(avatar, document.createTextNode(authorName));
+      
+      if (cm.inline) {
+        authorWrap.append(el('span', 'comment-tag-inline', 'inline'));
+      }
+      cHeader.append(authorWrap);
+
+      if (cm.created_time) {
+        const timeSpan = el('span', 'comment-time', cm.created_time.slice(0, 10));
+        cHeader.append(timeSpan);
+      }
+      cItem.append(cHeader);
+
+      const cBody = el('div', 'comment-body');
+      cBody.innerHTML = highlight(cm.excerpt || cm.text, q);
+      cItem.append(cBody);
+
+      cmtWrap.append(cItem);
     }
-    card.append(matchTags);
+    card.append(cmtWrap);
   }
 
   return card;
@@ -1295,11 +1441,6 @@ $('#q').oninput = () => {
 
 $('#btn-clear-all').onclick = clearAll;
 $('#btn-refresh').onclick = () => loadDatabases(true);
-$('#btn-reset-fields').onclick = () => {
-  for (const cb of $('#fieldlist').querySelectorAll('input')) cb.checked = true;
-  syncControls();
-  runSearch();
-};
 
 boot();
 </script>

@@ -17,7 +17,6 @@ export const PORT = Number(process.env.PORT || 3100);
 
 if (!NOTION_API_KEY) throw new Error('NOTION_API_KEY missing (see .env.example)');
 
-// Inline (block-level) comments cost one API call per block rather than per
-// page, so they are opt-in. Page-level comments are always indexed.
-export const INDEX_INLINE_COMMENTS = process.env.INDEX_INLINE_COMMENTS === '1';
+// Inline (block-level) comments are indexed by default along with page-level comments.
+export const INDEX_INLINE_COMMENTS = process.env.INDEX_INLINE_COMMENTS !== '0';
 
