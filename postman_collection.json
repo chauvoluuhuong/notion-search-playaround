@@ -10,7 +10,200 @@
       "name": "01 · Discovery & schema",
       "item": [
         {
-          "name": "List all discovered databases — RUN THIS FIRST",
+          "name": "List all workspace resources (pages & databases) — RUN THIS FIRST",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/resources",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resources"]
+            },
+            "description": "Discovers all accessible pages and databases. Captures `pageId` and `databaseId` automatically."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('has resources array', () => {",
+                  "  pm.expect(data).to.have.property('resources');",
+                  "  pm.expect(data.resources).to.be.an('array');",
+                  "  const page = data.resources.find(r => r.type === 'page');",
+                  "  if (page) {",
+                  "    pm.collectionVariables.set('pageId', page.id);",
+                  "    pm.collectionVariables.set('pageTitle', page.title);",
+                  "  }",
+                  "  const db = data.resources.find(r => r.type === 'database');",
+                  "  if (db) {",
+                  "    pm.collectionVariables.set('databaseId', db.id);",
+                  "    pm.collectionVariables.set('databaseTitle', db.title);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter resources by type=page",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/resources?type=page",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resources"],
+              "query": [{ "key": "type", "value": "page" }]
+            },
+            "description": "Lists only pages."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('contains only page resources', () => {",
+                  "  pm.expect(data).to.have.property('resources');",
+                  "  pm.expect(data.databases_count).to.eql(0);",
+                  "  data.resources.forEach(r => pm.expect(r.type).to.eql('page'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter resources by type=database",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/resources?type=database",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resources"],
+              "query": [{ "key": "type", "value": "database" }]
+            },
+            "description": "Lists only databases."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('contains only database resources', () => {",
+                  "  pm.expect(data).to.have.property('resources');",
+                  "  pm.expect(data.pages_count).to.eql(0);",
+                  "  data.resources.forEach(r => pm.expect(r.type).to.eql('database'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search resources by keyword (?q=...)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/resources?q=Basics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resources"],
+              "query": [{ "key": "q", "value": "Basics" }]
+            },
+            "description": "Searches workspace resource titles by keyword."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get deep page content & inline databases (/api/pages/:id)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pages/{{pageId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pages", "{{pageId}}"]
+            },
+            "description": "Fetches recursive blocks, parses inline databases as tables, and returns clean Markdown and JSON."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('has id, title, markdown, and inline_databases', () => {",
+                  "  pm.expect(data).to.have.property('id');",
+                  "  pm.expect(data).to.have.property('markdown');",
+                  "  pm.expect(data).to.have.property('inline_databases');",
+                  "  pm.expect(data.markdown).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get deep page content with comments (/api/pages/:id?include_comments=1)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pages/{{pageId}}?include_comments=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pages", "{{pageId}}"],
+              "query": [{ "key": "include_comments", "value": "1" }]
+            },
+            "description": "Fetches page content, inline databases, and unresolved comment threads."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('has comments array', () => {",
+                  "  pm.expect(data).to.have.property('comments');",
+                  "  pm.expect(data.comments).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List all discovered databases",
           "request": {
             "method": "GET",
             "header": [],
@@ -587,6 +780,16 @@
     {
       "key": "nextOffset",
       "value": "5",
+      "type": "string"
+    },
+    {
+      "key": "pageId",
+      "value": "276800dd-8789-81bc-a8b5-000b0f9f30b9",
+      "type": "string"
+    },
+    {
+      "key": "pageTitle",
+      "value": "The Notion Basics",
       "type": "string"
     }
   ]

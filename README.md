@@ -15,6 +15,8 @@ npm start        # http://localhost:3100
 | What | Where |
 |---|---|
 | Web Interface | http://localhost:3100/ |
+| Resource Discovery (Pages & Databases) | `GET /api/resources` (supports `?type=page`, `?type=database`, `?q=...`) |
+| Deep Page Content & Inline DBs | `GET /api/pages/:id` or `GET /api/resources/:id/content` |
 | Database Discovery | `GET /api/databases` |
 | Filter Instructions / Capabilities | `GET /api/filter-instructions/:id` or `GET /api/filter-instructions` |
 | Filter Capability & Schema API | `GET /api/filters/:id` or `GET /api/filters?database_id=<id>` |
@@ -23,7 +25,85 @@ npm start        # http://localhost:3100
 
 ---
 
-## 1. Database Discovery (`GET /api/databases`)
+## 1. Resource Discovery (`GET /api/resources`)
+
+Discovers all pages and databases accessible to your Notion integration token:
+
+```bash
+# List all resources (pages and databases)
+curl -s http://localhost:3100/api/resources
+
+# Filter by type
+curl -s "http://localhost:3100/api/resources?type=page"
+curl -s "http://localhost:3100/api/resources?type=database"
+```
+
+Example response:
+```json
+{
+  "resources": [
+    {
+      "id": "276800dd-8789-81bc-a8b5-000b0f9f30b9",
+      "type": "page",
+      "title": "The Notion Basics",
+      "url": "https://app.notion.com/276800dd878981bca8b5000b0f9f30b9",
+      "is_inline": false,
+      "properties_count": 1
+    },
+    {
+      "id": "bdaec82f-2142-4cf9-a017-ba7b47678e6c",
+      "type": "database",
+      "title": "IT Epics",
+      "url": "https://app.notion.com/bdaec82f21424cf9a017ba7b47678e6c",
+      "is_inline": false,
+      "properties_count": 6
+    }
+  ],
+  "count": 2,
+  "pages_count": 1,
+  "databases_count": 1
+}
+```
+
+---
+
+## 2. Deep Page Content & Inline Databases (`GET /api/pages/:id`)
+
+Fetches the complete content of a page (or database), recursively traversing block trees, detecting inline databases (`child_database`), querying their records, and converting everything into clean **Markdown** and structured **JSON**:
+
+```bash
+# Get page content by ID, raw 32-hex, or Notion URL
+curl -s http://localhost:3100/api/pages/276800dd-8789-81bc-a8b5-000b0f9f30b9
+
+# Include unresolved comments
+curl -s "http://localhost:3100/api/pages/276800dd-8789-81bc-a8b5-000b0f9f30b9?include_comments=1"
+```
+
+Example response:
+```json
+{
+  "id": "276800dd-8789-81bc-a8b5-000b0f9f30b9",
+  "type": "page",
+  "title": "The Notion Basics",
+  "properties": {},
+  "markdown": "# The Notion Basics\n\nWelcome to Notion!\n\n### Tasks (Inline Database)\n| Task | Status | Assignee |\n| :--- | :--- | :--- |\n| Setup repo | Done | Huong |\n",
+  "inline_databases": [
+    {
+      "id": "inline-db-uuid",
+      "title": "Tasks",
+      "columns": ["Task", "Status", "Assignee"],
+      "row_count": 1,
+      "rows": [...]
+    }
+  ],
+  "blocks_count": 12,
+  "inline_databases_count": 1
+}
+```
+
+---
+
+## 3. Database Discovery (`GET /api/databases`)
 
 Discovers all databases accessible to your Notion integration token:
 
@@ -55,7 +135,7 @@ Force a cache refresh: `GET /api/databases?refresh=1`.
 
 ---
 
-## 2. Schema Discovery & Filter Instructions (`GET /api/filter-instructions/:id`)
+## 4. Schema Discovery & Filter Instructions (`GET /api/filter-instructions/:id`)
 
 Returns a simple, self-describing capability document tailored for AI Agents and API clients, detailing:
 - Available fields and their accepted values / formats
@@ -126,7 +206,7 @@ curl "http://localhost:3100/api/filter-instructions/9d483ce4-2747-4ea3-a741-bc9a
 
 ---
 
-## 3. Universal Search & Filtering (`POST /api/search`)
+## 5. Universal Search & Filtering (`POST /api/search`)
 
 The search endpoint accepts a JSON object with:
 - `databaseId`: Database ID or title (optional if using default database)
@@ -177,7 +257,7 @@ curl -X POST "http://localhost:3100/api/search" \
 
 ---
 
-## 4. Web UI Features
+## 6. Web UI Features
 
 - **Database Switcher:** Dropdown in the header to switch between any discovered database on the fly.
 - **Dynamic Filter Controls:** Form inputs automatically generate according to the selected database's schema (Select / Multi-select / Status with Notion colors and counts, People user pickers, Relation target pickers, Number comparisons, Date selectors, and Checkboxes).
@@ -187,13 +267,15 @@ curl -X POST "http://localhost:3100/api/search" \
 
 ---
 
-## 5. Running Tests
+## 7. Running Tests
 
 ```bash
 npm test
 ```
 
 Runs the test suite verifying:
+- Resource discovery & type filtering (`listResources`)
+- Single page & inline database content extraction (`getResourceContent`)
 - Database discovery (`listDatabases`)
 - Schema and filter options discovery
 - Relation target page title resolution

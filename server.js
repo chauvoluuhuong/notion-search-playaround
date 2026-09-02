@@ -2,6 +2,8 @@ import express from 'express';
 import path from 'node:path';
 import { PORT } from './src/config.js';
 import { listDatabases, resolveDatabaseId } from './src/databases.js';
+import { listResources } from './src/resources.js';
+import { getResourceContent } from './src/page_content.js';
 import { getDatabaseSchema } from './src/directory.js';
 import { filterInstructions } from './src/filters.js';
 import { search } from './src/search.js';
@@ -17,6 +19,16 @@ const wrap = (fn) => (req, res) =>
     console.error(err);
     res.status(status).json({ error: err.message, code: err.code ?? 'internal_error' });
   });
+
+/** Discover and list all Notion resources (pages and databases) in the workspace. */
+app.get('/api/resources', wrap(async (req, res) => {
+  const result = await listResources({
+    type: req.query.type,
+    query: req.query.q || req.query.query,
+    refresh: req.query.refresh === '1' || req.query.refresh === 'true',
+  });
+  res.json(result);
+}));
 
 /** Discover and list all Notion databases in the workspace. */
 app.get('/api/databases', wrap(async (req, res) => {
@@ -70,6 +82,20 @@ app.get('/api/options', wrap(async (req, res) => {
   });
 }));
 
+/** Full content of a page or database, including nested blocks and inline databases. */
+const handleContent = wrap(async (req, res) => {
+  const resourceId = req.params.id || req.query.id;
+  const content = await getResourceContent(resourceId, {
+    include_comments: req.query.include_comments === '1' || req.query.include_comments === 'true',
+    refresh: req.query.refresh === '1' || req.query.refresh === 'true',
+  });
+  res.json(content);
+});
+
+app.get('/api/resources/:id/content', handleContent);
+app.get('/api/pages/:id/content', handleContent);
+app.get('/api/pages/:id', handleContent);
+
 app.post('/api/search', wrap(async (req, res) => res.json(await search(req.body || {}))));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -77,6 +103,8 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.listen(PORT, () => {
   console.log(`notion-search  →  http://localhost:${PORT}`);
   console.log(`  UI               http://localhost:${PORT}/`);
+  console.log(`  resources API    http://localhost:${PORT}/api/resources`);
+  console.log(`  page content API http://localhost:${PORT}/api/pages/:id`);
   console.log(`  databases API    http://localhost:${PORT}/api/databases`);
   console.log(`  search API       http://localhost:${PORT}/api/search`);
   console.log(`  filter API       http://localhost:${PORT}/api/filters`);

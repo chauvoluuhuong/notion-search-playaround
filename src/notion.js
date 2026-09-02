@@ -60,6 +60,25 @@ export async function searchAllDatabases() {
   return out;
 }
 
+/** Query every resource (pages and databases) in workspace. */
+export async function searchAllResources({ query, filter } = {}) {
+  const out = [];
+  let cursor;
+  do {
+    const body = {
+      page_size: 100,
+      start_cursor: cursor,
+    };
+    if (query) body.query = query;
+    if (filter) body.filter = filter;
+
+    const res = await searchObjects(body);
+    out.push(...(res.results || []));
+    cursor = res.has_more ? res.next_cursor : undefined;
+  } while (cursor);
+  return out;
+}
+
 /** Query every page of a database (handles pagination). */
 export async function queryAll(id, body = {}) {
   const out = [];
@@ -72,9 +91,59 @@ export async function queryAll(id, body = {}) {
   return out;
 }
 
-// ---------- property readers ----------
+// ---------- property readers & markdown helpers ----------
 
 export const plainText = (rich) => (rich || []).map((t) => t.plain_text).join('');
+
+export function richTextToMarkdown(rich) {
+  if (!rich || !Array.isArray(rich)) return '';
+  return rich
+    .map((item) => {
+      let text = item.plain_text ?? '';
+      if (!text) return '';
+      const ann = item.annotations || {};
+      if (ann.code) text = `\`${text}\``;
+      if (ann.bold) text = `**${text}**`;
+      if (ann.italic) text = `*${text}*`;
+      if (ann.strikethrough) text = `~~${text}~~`;
+      if (ann.underline) text = `<u>${text}</u>`;
+      if (item.href) text = `[${text}](${item.href})`;
+      return text;
+    })
+    .join('');
+}
+
+export function extractTitle(obj) {
+  if (!obj) return 'Untitled';
+  if (obj.object === 'database') {
+    return plainText(obj.title) || 'Untitled Database';
+  }
+  if (obj.object === 'page') {
+    // Check page properties for title type
+    const props = obj.properties || {};
+    for (const p of Object.values(props)) {
+      if (p && p.type === 'title') {
+        return plainText(p.title) || 'Untitled Page';
+      }
+    }
+  }
+  return 'Untitled';
+}
+
+export function extractIcon(icon) {
+  if (!icon) return null;
+  if (icon.type === 'emoji') return icon.emoji;
+  if (icon.type === 'external') return icon.external?.url ?? null;
+  if (icon.type === 'file') return icon.file?.url ?? null;
+  return null;
+}
+
+export function extractCover(cover) {
+  if (!cover) return null;
+  if (cover.type === 'external') return cover.external?.url ?? null;
+  if (cover.type === 'file') return cover.file?.url ?? null;
+  return null;
+}
 
 export function readProperty(prop) {
   if (!prop) return null;
