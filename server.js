@@ -22,12 +22,10 @@ const wrap = (fn) => (req, res) =>
 
 /** Discover and list all Notion resources (pages and databases) in the workspace. */
 app.get('/api/resources', wrap(async (req, res) => {
-  const result = await listResources({
+  res.json(await listResources({
     type: req.query.type,
     query: req.query.q || req.query.query,
-    refresh: req.query.refresh === '1' || req.query.refresh === 'true',
-  });
-  res.json(result);
+  }));
 }));
 
 /** Discover and list all Notion databases in the workspace. */
@@ -84,12 +82,7 @@ app.get('/api/options', wrap(async (req, res) => {
 
 /** Full content of a page or database, including nested blocks and inline databases. */
 const handleContent = wrap(async (req, res) => {
-  const resourceId = req.params.id || req.query.id;
-  const content = await getResourceContent(resourceId, {
-    include_comments: req.query.include_comments === '1' || req.query.include_comments === 'true',
-    refresh: req.query.refresh === '1' || req.query.refresh === 'true',
-  });
-  res.json(content);
+  res.json(await getResourceContent(req.params.id || req.query.id));
 });
 
 app.get('/api/resources/:id/content', handleContent);

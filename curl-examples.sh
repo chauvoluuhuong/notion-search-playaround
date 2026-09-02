@@ -22,12 +22,9 @@ curl -sS "$BASE/api/resources?type=database"
 # Search resources by title keyword
 curl -sS "$BASE/api/resources?q=Basics"
 
-# Get full content of a page (including nested blocks, inline databases, markdown)
+# Get full content of a page (all recursive blocks, inline databases, comments, markdown)
 # Can pass dashed UUID, 32-hex ID, or full Notion URL
 curl -sS "$BASE/api/pages/276800dd-8789-81bc-a8b5-000b0f9f30b9"
-
-# Get full content including comments
-curl -sS "$BASE/api/pages/276800dd-8789-81bc-a8b5-000b0f9f30b9?include_comments=1"
 
 #==========================================================================
 # 02 · Database Discovery & Filter Instructions

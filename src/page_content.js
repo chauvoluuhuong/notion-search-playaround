@@ -15,16 +15,13 @@ import {
 import { dashedUuid, isUuid } from './databases.js';
 import { listResources } from './resources.js';
 
-const TTL_MS = 3 * 60 * 1000; // 3 min cache
-const cache = new Map();
-
 /**
- * Extract Notion ID from URL, raw string, or title.
+ * Extract Notion ID from URL, raw 32-hex string, dashed UUID, or title.
  */
 export async function resolveResourceId(input) {
   if (!input) throw new Error('Resource ID or URL is required');
 
-  let s = String(input).trim();
+  const s = String(input).trim();
 
   // If it's a Notion URL (e.g. https://www.notion.so/workspace/Page-Title-32hexchars or ?p=32hexchars)
   const urlMatch = s.match(/[0-9a-f]{32}/i);
@@ -71,7 +68,6 @@ function rowsToMarkdownTable(title, columns, rows) {
       } else {
         str = String(val);
       }
-      // Clean up newlines and pipe characters for Markdown table
       return str.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
     });
     return `| ${cells.join(' | ')} |`;
@@ -276,7 +272,6 @@ function blockToMarkdown(b, indentLevel = 0) {
       break;
   }
 
-  // If standard block had children that weren't already formatted (like callout children)
   if (type !== 'toggle' && b.children && b.children.length > 0) {
     const childrenMd = b.children.map((k) => blockToMarkdown(k, indentLevel + 1)).join('');
     result += childrenMd;
@@ -286,16 +281,10 @@ function blockToMarkdown(b, indentLevel = 0) {
 }
 
 /**
- * Build the full content of a page or database.
+ * Fetch and extract full content of a page or database (all blocks, inline DBs, and comments). No caching.
  */
-export async function getResourceContent(resourceIdOrUrl, { include_comments = false, refresh = false } = {}) {
+export async function getResourceContent(resourceIdOrUrl) {
   const id = await resolveResourceId(resourceIdOrUrl);
-  const cacheKey = `${id}_comments=${include_comments}`;
-
-  if (!refresh && cache.has(cacheKey)) {
-    const cached = cache.get(cacheKey);
-    if (Date.now() - cached.at < TTL_MS) return cached.value;
-  }
 
   // Check if it's a page or a database
   let isPage = false;
@@ -309,11 +298,10 @@ export async function getResourceContent(resourceIdOrUrl, { include_comments = f
       try {
         rawObject = await getDatabase(id);
         isPage = false;
-      } catch (dbErr) {
+      } catch {
         throw new Error(`Resource "${id}" was not found as a Page or Database in Notion.`);
       }
     } else {
-      // Try database as fallback
       try {
         rawObject = await getDatabase(id);
         isPage = false;
@@ -322,8 +310,6 @@ export async function getResourceContent(resourceIdOrUrl, { include_comments = f
       }
     }
   }
-
-  let result;
 
   if (isPage) {
     // Read page properties
@@ -341,28 +327,26 @@ export async function getResourceContent(resourceIdOrUrl, { include_comments = f
 
     // Format Markdown content
     let markdownBody = blocks.map((b) => blockToMarkdown(b, 0)).join('');
-    // Clean up excessive blank lines
     markdownBody = markdownBody.replace(/\n{3,}/g, '\n\n').trim();
 
     const titlePrefix = icon ? `${icon} ${title}` : title;
     const fullMarkdown = `# ${titlePrefix}\n\n${markdownBody}`;
 
+    // Always fetch comments
     let comments = [];
-    if (include_comments) {
-      try {
-        const commentsRes = await getComments(id);
-        comments = (commentsRes.results || []).map((c) => ({
-          id: c.id,
-          text: richTextToMarkdown(c.rich_text),
-          author_id: c.created_by?.id ?? null,
-          created_time: c.created_time ?? null,
-        }));
-      } catch (err) {
-        console.error(`Error fetching comments for ${id}:`, err.message);
-      }
+    try {
+      const commentsRes = await getComments(id);
+      comments = (commentsRes.results || []).map((c) => ({
+        id: c.id,
+        text: richTextToMarkdown(c.rich_text),
+        author_id: c.created_by?.id ?? null,
+        created_time: c.created_time ?? null,
+      }));
+    } catch (err) {
+      console.error(`Error fetching comments for ${id}:`, err.message);
     }
 
-    result = {
+    return {
       id: dashedUuid(id),
       type: 'page',
       title,
@@ -377,7 +361,7 @@ export async function getResourceContent(resourceIdOrUrl, { include_comments = f
       inline_databases: inlineDatabases,
       inline_databases_count: inlineDatabases.length,
       blocks_count: blocks.length,
-      comments: include_comments ? comments : undefined,
+      comments,
     };
   } else {
     // It's a Database
@@ -402,7 +386,7 @@ export async function getResourceContent(resourceIdOrUrl, { include_comments = f
 
     const markdownTable = rowsToMarkdownTable(title, propNames, rows);
 
-    result = {
+    return {
       id: dashedUuid(id),
       type: 'database',
       title,
@@ -419,7 +403,4 @@ export async function getResourceContent(resourceIdOrUrl, { include_comments = f
       markdown: `# ${icon ? `${icon} ` : ''}${title}\n\n${markdownTable}`,
     };
   }
-
-  cache.set(cacheKey, { at: Date.now(), value: result });
-  return result;
 }

@@ -140,7 +140,7 @@
           ]
         },
         {
-          "name": "Get deep page content & inline databases (/api/pages/:id)",
+          "name": "Get full page content & inline databases (/api/pages/:id)",
           "request": {
             "method": "GET",
             "header": [],
@@ -149,7 +149,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "pages", "{{pageId}}"]
             },
-            "description": "Fetches recursive blocks, parses inline databases as tables, and returns clean Markdown and JSON."
+            "description": "Fetches all content of the page: all recursive blocks, markdown document, inline databases as tables, and comments. No options required."
           },
           "response": [],
           "event": [
@@ -160,41 +160,14 @@
                 "exec": [
                   "pm.test('200 OK', () => pm.response.to.have.status(200));",
                   "const data = pm.response.json();",
-                  "pm.test('has id, title, markdown, and inline_databases', () => {",
+                  "pm.test('has id, title, markdown, inline_databases, and comments', () => {",
                   "  pm.expect(data).to.have.property('id');",
+                  "  pm.expect(data).to.have.property('title');",
                   "  pm.expect(data).to.have.property('markdown');",
                   "  pm.expect(data).to.have.property('inline_databases');",
-                  "  pm.expect(data.markdown).to.be.a('string');",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Get deep page content with comments (/api/pages/:id?include_comments=1)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/pages/{{pageId}}?include_comments=1",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "pages", "{{pageId}}"],
-              "query": [{ "key": "include_comments", "value": "1" }]
-            },
-            "description": "Fetches page content, inline databases, and unresolved comment threads."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const data = pm.response.json();",
-                  "pm.test('has comments array', () => {",
                   "  pm.expect(data).to.have.property('comments');",
+                  "  pm.expect(data.markdown).to.be.a('string');",
+                  "  pm.expect(data.inline_databases).to.be.an('array');",
                   "  pm.expect(data.comments).to.be.an('array');",
                   "});"
                 ]

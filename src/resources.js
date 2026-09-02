@@ -1,9 +1,6 @@
 import { searchAllResources, extractTitle, extractIcon, extractCover } from './notion.js';
 import { dashedUuid } from './databases.js';
 
-const TTL_MS = 5 * 60 * 1000;
-let cache = null;
-
 function shapeResource(item) {
   const isDb = item.object === 'database';
   const id = dashedUuid(item.id);
@@ -36,20 +33,10 @@ function shapeResource(item) {
 }
 
 /**
- * List all resources (pages and databases) in the workspace.
- * Optional filters: type ('page' | 'database'), query (string).
+ * List all resources (pages and databases) directly from Notion (no cache).
  */
-export async function listResources({ type, query, refresh = false } = {}) {
+export async function listResources({ type, query } = {}) {
   const normType = type ? String(type).trim().toLowerCase() : null;
-
-  // Use full cache if no specific query is given
-  if (!refresh && !query && cache && Date.now() - cache.at < TTL_MS) {
-    let items = cache.value;
-    if (normType) {
-      items = items.filter((r) => r.type === normType);
-    }
-    return buildSummary(items);
-  }
 
   let filter;
   if (normType === 'page' || normType === 'database') {
@@ -59,15 +46,6 @@ export async function listResources({ type, query, refresh = false } = {}) {
   const raw = await searchAllResources({ query, filter });
   const resources = raw.map(shapeResource);
 
-  // If this was an unfiltered fetch, update the cache
-  if (!query && !normType) {
-    cache = { at: Date.now(), value: resources };
-  }
-
-  return buildSummary(resources);
-}
-
-function buildSummary(resources) {
   const pagesCount = resources.filter((r) => r.type === 'page').length;
   const databasesCount = resources.filter((r) => r.type === 'database').length;
 

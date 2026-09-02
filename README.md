@@ -69,14 +69,11 @@ Example response:
 
 ## 2. Deep Page Content & Inline Databases (`GET /api/pages/:id`)
 
-Fetches the complete content of a page (or database), recursively traversing block trees, detecting inline databases (`child_database`), querying their records, and converting everything into clean **Markdown** and structured **JSON**:
+Fetches the complete content of a page (or database), recursively traversing block trees, detecting inline databases (`child_database`), querying their records, and converting everything into clean **Markdown** and structured **JSON** (including properties, blocks, inline DB tables, and comments automatically):
 
 ```bash
 # Get page content by ID, raw 32-hex, or Notion URL
 curl -s http://localhost:3100/api/pages/276800dd-8789-81bc-a8b5-000b0f9f30b9
-
-# Include unresolved comments
-curl -s "http://localhost:3100/api/pages/276800dd-8789-81bc-a8b5-000b0f9f30b9?include_comments=1"
 ```
 
 Example response:
