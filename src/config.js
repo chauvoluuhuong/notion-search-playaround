@@ -13,7 +13,7 @@ if (fs.existsSync(envPath)) {
 export const NOTION_API_KEY = process.env.NOTION_API_KEY;
 export const NOTION_VERSION = process.env.NOTION_VERSION || '2022-06-28';
 export const DEFAULT_DATABASE_ID = process.env.NOTION_DATABASE_ID || null;
-export const PORT = Number(process.env.PORT || 3000);
+export const PORT = Number(process.env.PORT || 3100);
 
 if (!NOTION_API_KEY) throw new Error('NOTION_API_KEY missing (see .env.example)');
 

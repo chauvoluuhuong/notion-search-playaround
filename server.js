@@ -39,7 +39,20 @@ app.get('/api/filters', wrap(async (req, res) => {
   const databaseId = req.query.database_id || req.query.database;
   res.json(await filterInstructions({ databaseId, refresh: req.query.refresh === '1' }));
 }));
-app.get('/api/filter-instructions', (req, res) => res.redirect(307, '/api/filters'));
+app.get('/api/filters/:id', wrap(async (req, res) => {
+  const databaseId = req.params.id;
+  res.json(await filterInstructions({ databaseId, refresh: req.query.refresh === '1' }));
+}));
+
+/** Filter instructions endpoint: returns dynamic filter capability document by database ID or default. */
+app.get('/api/filter-instructions', wrap(async (req, res) => {
+  const databaseId = req.query.database_id || req.query.database;
+  res.json(await filterInstructions({ databaseId, refresh: req.query.refresh === '1' }));
+}));
+app.get('/api/filter-instructions/:id', wrap(async (req, res) => {
+  const databaseId = req.params.id;
+  res.json(await filterInstructions({ databaseId, refresh: req.query.refresh === '1' }));
+}));
 
 /** Value lists & options for populating dynamic dropdowns. */
 app.get('/api/options', wrap(async (req, res) => {
@@ -68,4 +81,5 @@ app.listen(PORT, () => {
   console.log(`  databases API    http://localhost:${PORT}/api/databases`);
   console.log(`  search API       http://localhost:${PORT}/api/search`);
   console.log(`  filter API       http://localhost:${PORT}/api/filters`);
+  console.log(`  instructions API http://localhost:${PORT}/api/filter-instructions/:id`);
 });

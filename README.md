@@ -16,7 +16,8 @@ npm start        # http://localhost:3100
 |---|---|
 | Web Interface | http://localhost:3100/ |
 | Database Discovery | `GET /api/databases` |
-| Filter Capability & Schema API | `GET /api/filters?database_id=<id>` |
+| Filter Instructions / Capabilities | `GET /api/filter-instructions/:id` or `GET /api/filter-instructions` |
+| Filter Capability & Schema API | `GET /api/filters/:id` or `GET /api/filters?database_id=<id>` |
 | Dropdown & Option Values | `GET /api/options?database_id=<id>` |
 | Universal Search & Filter API | `GET /api/search` / `POST /api/search` |
 
@@ -54,7 +55,7 @@ Force a cache refresh: `GET /api/databases?refresh=1`.
 
 ---
 
-## 2. Schema Discovery & Filter Capabilities (`GET /api/filters`)
+## 2. Schema Discovery & Filter Instructions (`GET /api/filter-instructions/:id` or `GET /api/filters`)
 
 Given any database ID or title, returns a self-describing capability document with:
 - All properties and their Notion types (`select`, `multi_select`, `status`, `people`, `relation`, `number`, `date`, `checkbox`, `rich_text`, `title`, etc.)
@@ -64,6 +65,10 @@ Given any database ID or title, returns a self-describing capability document wi
 - Searchable text fields including page body and unresolved comments
 
 ```bash
+# Get instructions by database ID in the path
+curl "http://localhost:3100/api/filter-instructions/9d483ce4-2747-4ea3-a741-bc9a2bc98c4e"
+
+# Or with query parameter
 curl "http://localhost:3100/api/filters?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e"
 ```
 

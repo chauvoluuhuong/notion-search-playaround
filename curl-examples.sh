@@ -17,10 +17,12 @@ curl -sS "$BASE/api/databases"
 curl -sS "$BASE/api/databases?refresh=1"
 
 # Get dynamic filter capabilities for the default database
+curl -sS "$BASE/api/filter-instructions"
 curl -sS "$BASE/api/filters"
 
-# Get dynamic filter capabilities for a specific database (by ID)
+# Get dynamic filter instructions for a specific database (by ID in path or query)
 # e.g., IT User Stories: 9d483ce4-2747-4ea3-a741-bc9a2bc98c4e
+curl -sS "$BASE/api/filter-instructions/9d483ce4-2747-4ea3-a741-bc9a2bc98c4e"
 curl -sS "$BASE/api/filters?database_id=9d483ce4-2747-4ea3-a741-bc9a2bc98c4e"
 
 # Get options and dropdown values for a specific database

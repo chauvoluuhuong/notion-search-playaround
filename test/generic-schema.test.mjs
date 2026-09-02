@@ -41,13 +41,16 @@ for (const db of databases) {
     assert.ok(typeof schema.relations_by_property === 'object');
   });
 
-  await t(`generates filter instructions capability document for "${db.title}"`, async () => {
-    const doc = await filterInstructions({ databaseId: db.id });
-    assert.equal(doc.database.id, db.id);
-    assert.ok(doc.how_to_call);
-    assert.ok(doc.text_search);
-    assert.ok(Array.isArray(doc.filters));
-    assert.ok(Array.isArray(doc.examples));
+  await t(`generates filter instructions capability document for "${db.title}" by ID and title`, async () => {
+    const docById = await filterInstructions({ databaseId: db.id });
+    assert.equal(docById.database.id, db.id);
+    assert.ok(docById.how_to_call);
+    assert.ok(docById.text_search);
+    assert.ok(Array.isArray(docById.filters));
+    assert.ok(Array.isArray(docById.examples));
+
+    const docByTitle = await filterInstructions({ databaseId: db.title });
+    assert.equal(docByTitle.database.id, db.id);
   });
 
   await t(`executes generic search on "${db.title}"`, async () => {
