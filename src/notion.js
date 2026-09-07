@@ -43,6 +43,7 @@ export const getBlockChildren = (blockId, cursor) =>
 // Returns UNRESOLVED comments only — Notion exposes no way to read resolved threads.
 export const getComments = (blockId, cursor) =>
   request('GET', `/comments?block_id=${blockId}&page_size=100${cursor ? `&start_cursor=${cursor}` : ''}`);
+export const createComment = (body) => request('POST', '/comments', body);
 
 export const createPage = (body) => request('POST', '/pages', body);
 export const updatePage = (id, body) => request('PATCH', `/pages/${id}`, body);

@@ -486,7 +486,7 @@ export async function search(params = {}) {
       ? r.comments
           .filter((c) => c.text.toLowerCase().includes(q.toLowerCase()))
           .map((c) => ({ ...c, excerpt: snippet(c.text, q) }))
-      : [],
+      : r.comments.slice(0, 5),
   }));
 
   return {

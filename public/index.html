@@ -344,6 +344,40 @@
     border-color: var(--accent);
     box-shadow: var(--shadow-sm);
   }
+  .btn-card-comment {
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--panel-sub);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+    white-space: nowrap;
+  }
+  .btn-card-comment:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent-border);
+  }
+  .comments-modal-box {
+    margin-top: 18px;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  .comments-modal-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    padding-right: 4px;
+  }
   .btn-chip-emoji {
     border: 1px solid var(--line);
     background: var(--panel);
@@ -1146,6 +1180,14 @@
             </div>
           </div>
 
+          <div class="form-group full-width" style="margin-top: 14px;">
+            <label for="create-field-comment">
+              <span>Initial Comment (Optional)</span>
+              <span class="prop-type-badge">page comment</span>
+            </label>
+            <input type="text" id="create-field-comment" class="form-control" placeholder="e.g. Needs review before Friday or @mention team (markdown supported)">
+          </div>
+
           <div class="actions" style="margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line);">
             <button type="button" class="btn-secondary" id="create-btn-reset">Reset Form</button>
             <span class="spacer"></span>
@@ -1245,6 +1287,30 @@
           </div>
         </div>
       </form>
+
+      <!-- COMMENTS SECTION -->
+      <div class="comments-modal-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <label style="font-weight:600; font-size:13.5px; margin:0; display:flex; align-items:center; gap:8px;">
+            <span>💬 Comments</span>
+            <span id="edit-comments-count-badge" class="badge" style="background:var(--chip); font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;">0</span>
+          </label>
+          <button type="button" id="edit-btn-refresh-comments" class="btn-ghost" style="font-size:12px; padding:3px 8px; cursor:pointer; background:none; border:1px solid var(--line); border-radius:4px; color:var(--muted);" title="Reload comments from Notion">↻ Refresh</button>
+        </div>
+
+        <div id="edit-comments-list" class="comments-modal-list">
+          <div class="comments-empty-state" style="color:var(--muted); font-size:13px; font-style:italic; padding:8px 0;">No comments on this page yet.</div>
+        </div>
+
+        <div class="comment-composer" style="display:flex; gap:8px; align-items:flex-start;">
+          <textarea id="edit-comment-input" class="form-control" rows="2" placeholder="Write a comment... (markdown supported: **bold**, *italic*, `code`, [link](url))" style="flex:1; font-size:13px; resize:vertical;"></textarea>
+          <button type="button" class="btn-primary" id="edit-btn-post-comment" style="white-space:nowrap; height:fit-content; padding:8px 14px; font-size:13px;">
+            <span id="edit-comment-spinner" class="loading-spinner" hidden></span>
+            <span id="edit-comment-submit-label">💬 Post</span>
+          </button>
+        </div>
+        <div id="edit-comment-feedback" class="api-feedback-box" hidden style="margin-top:8px;"></div>
+      </div>
 
       <div id="edit-api-feedback" class="api-feedback-box" hidden></div>
     </div>
@@ -1818,6 +1884,18 @@ function renderCard(r, q) {
   };
   metaRight.append(editBtn);
 
+  // Quick Comment Button
+  const commentCount = r.comment_count ?? (r.comments ? r.comments.length : 0);
+  const cmtLabel = commentCount > 0 ? `💬 ${commentCount}` : '💬 Comment';
+  const cmtBtn = el('button', 'btn-card-comment', cmtLabel);
+  cmtBtn.type = 'button';
+  cmtBtn.title = commentCount > 0 ? `${commentCount} comment${commentCount === 1 ? '' : 's'} — click to view & reply` : 'Add comment';
+  cmtBtn.onclick = (e) => {
+    e.stopPropagation();
+    openEditModal(r, { focusComment: true });
+  };
+  metaRight.append(cmtBtn);
+
   if (r.last_edited_time) {
     const time = el('span', 'card-time');
     time.innerHTML = `<span>🕒</span> Updated ${esc(r.last_edited_time.slice(0, 10))}`;
@@ -2181,6 +2259,8 @@ function renderCreateForm() {
   $('#create-field-content').oninput = updateCreateRawJson;
   $('#create-field-icon').oninput = updateCreateRawJson;
   $('#create-field-cover').oninput = updateCreateRawJson;
+  const cmtInput = $('#create-field-comment');
+  if (cmtInput) cmtInput.oninput = updateCreateRawJson;
 }
 
 function updateCreateRawJson() {
@@ -2188,6 +2268,7 @@ function updateCreateRawJson() {
   const content = $('#create-field-content').value.trim();
   const icon = $('#create-field-icon').value.trim();
   const cover = $('#create-field-cover').value.trim();
+  const comment = $('#create-field-comment')?.value.trim();
 
   const payload = {
     databaseId: ACTIVE_DB_ID,
@@ -2196,6 +2277,7 @@ function updateCreateRawJson() {
   if (content) payload.content = content;
   if (icon) payload.icon = icon;
   if (cover) payload.cover = cover;
+  if (comment) payload.comment = comment;
 
   $('#create-raw-json').value = JSON.stringify(payload, null, 2);
 }
@@ -2239,6 +2321,7 @@ async function submitCreateItem(rawPayload = null) {
       const content = $('#create-field-content').value.trim();
       const icon = $('#create-field-icon').value.trim();
       const cover = $('#create-field-cover').value.trim();
+      const comment = $('#create-field-comment')?.value.trim();
 
       payload = {
         databaseId: ACTIVE_DB_ID,
@@ -2247,6 +2330,7 @@ async function submitCreateItem(rawPayload = null) {
       if (content) payload.content = content;
       if (icon) payload.icon = icon;
       if (cover) payload.cover = cover;
+      if (comment) payload.comment = comment;
     }
 
     const res = await fetch('/api/pages', {
@@ -2304,7 +2388,58 @@ function renderDocsView() {
 
 // ---------- EDIT ITEM MODAL IMPLEMENTATION ----------
 
-function openEditModal(item) {
+async function loadModalComments(pageId) {
+  const list = $('#edit-comments-list');
+  const badge = $('#edit-comments-count-badge');
+  if (!list) return;
+
+  list.innerHTML = '<div style="color:var(--muted); font-size:13px; padding:8px 0;"><span class="loading-spinner"></span> Loading comments…</div>';
+
+  try {
+    const res = await fetch(`/api/pages/${pageId}/comments`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    const comments = data.comments || [];
+    if (badge) badge.textContent = comments.length;
+
+    if (comments.length === 0) {
+      list.innerHTML = '<div class="comments-empty-state" style="color:var(--muted); font-size:13px; font-style:italic; padding:8px 0;">No comments on this page yet. Start the conversation below!</div>';
+      return;
+    }
+
+    list.innerHTML = '';
+    for (const c of comments) {
+      const item = el('div', 'comment-item');
+      const header = el('div', 'comment-header');
+      const authorWrap = el('div', 'comment-author');
+      const name = c.author || 'Author';
+      const avatar = el('span', 'comment-avatar', name.charAt(0).toUpperCase());
+      authorWrap.append(avatar, document.createTextNode(' ' + name));
+      header.append(authorWrap);
+
+      if (c.created_time) {
+        const d = new Date(c.created_time);
+        const timeStr = isNaN(d.getTime()) ? c.created_time.slice(0, 10) : d.toLocaleString();
+        header.append(el('span', 'comment-time', timeStr));
+      }
+      item.append(header);
+
+      const body = el('div', 'comment-body');
+      body.style.whiteSpace = 'pre-wrap';
+      body.style.wordBreak = 'break-word';
+      body.textContent = c.text || '';
+      item.append(body);
+
+      list.append(item);
+    }
+    list.scrollTop = list.scrollHeight;
+  } catch (err) {
+    list.innerHTML = `<div style="color:#ef4444; font-size:13px; padding:8px 0;">⚠️ Failed to load comments: ${esc(err.message)}</div>`;
+  }
+}
+
+function openEditModal(item, { focusComment = false } = {}) {
   try {
     if (!item) return;
     EDITING_ITEM = item;
@@ -2319,6 +2454,10 @@ function openEditModal(item) {
     $('#edit-field-icon').value = typeof item.icon === 'string' ? item.icon : (item.icon?.emoji || '');
     $('#edit-field-cover').value = typeof item.cover === 'string' ? item.cover : (item.cover?.url || '');
     $('#edit-api-feedback').hidden = true;
+    const cmtFeedback = $('#edit-comment-feedback');
+    if (cmtFeedback) cmtFeedback.hidden = true;
+    const cmtInput = $('#edit-comment-input');
+    if (cmtInput) cmtInput.value = '';
 
     const container = $('#edit-form-fields');
     buildFieldsIntoContainer(container, ACTIVE_SCHEMA, item);
@@ -2328,11 +2467,22 @@ function openEditModal(item) {
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
 
-    // Focus first editable input
+    // Fetch and render comments for this item
+    loadModalComments(item.id);
+
+    // Focus input or comment box
     setTimeout(() => {
-      const firstInput = container.querySelector('input, select, textarea');
-      if (firstInput) firstInput.focus();
-    }, 50);
+      if (focusComment) {
+        const commentBox = $('#edit-comment-input');
+        if (commentBox) {
+          commentBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          commentBox.focus();
+        }
+      } else {
+        const firstInput = container.querySelector('input, select, textarea');
+        if (firstInput) firstInput.focus();
+      }
+    }, 80);
   } catch (err) {
     console.error('Error opening edit modal:', err);
     alert('Could not open item editor: ' + err.message);
@@ -2355,6 +2505,69 @@ $('#edit-modal').onclick = (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && $('#edit-modal').classList.contains('open')) {
     closeEditModal();
+  }
+});
+
+$('#edit-btn-post-comment').onclick = async () => {
+  if (!EDITING_ITEM) return;
+  const input = $('#edit-comment-input');
+  const text = input.value.trim();
+  const feedback = $('#edit-comment-feedback');
+  const btn = $('#edit-btn-post-comment');
+  const spinner = $('#edit-comment-spinner');
+  const label = $('#edit-comment-submit-label');
+
+  if (!text) {
+    feedback.className = 'api-feedback-box error';
+    feedback.textContent = 'Please enter comment text before posting.';
+    feedback.hidden = false;
+    input.focus();
+    return;
+  }
+
+  feedback.hidden = true;
+  spinner.hidden = false;
+  btn.disabled = true;
+  label.textContent = 'Posting…';
+
+  try {
+    const res = await fetch(`/api/pages/${EDITING_ITEM.id}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    input.value = '';
+    feedback.className = 'api-feedback-box success';
+    feedback.textContent = '✅ Comment posted!';
+    feedback.hidden = false;
+    setTimeout(() => { feedback.hidden = true; }, 3000);
+
+    await loadModalComments(EDITING_ITEM.id);
+  } catch (err) {
+    feedback.className = 'api-feedback-box error';
+    feedback.textContent = `❌ ${err.message}`;
+    feedback.hidden = false;
+  } finally {
+    spinner.hidden = true;
+    btn.disabled = false;
+    label.textContent = '💬 Post';
+  }
+};
+
+$('#edit-btn-refresh-comments').onclick = () => {
+  if (EDITING_ITEM) {
+    loadModalComments(EDITING_ITEM.id);
+  }
+};
+
+$('#edit-comment-input').addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    $('#edit-btn-post-comment').click();
   }
 });
 

@@ -6,6 +6,8 @@ import {
   appendBlockChildren,
   getPage,
   getDatabase,
+  getComments,
+  createComment,
   readProperty,
   extractTitle,
   extractIcon,
@@ -548,6 +550,7 @@ export async function createPageItem({
   children = [],
   icon,
   cover,
+  comment,
 } = {}) {
   let finalParent = parent;
   let targetDbId = databaseId || properties.database_id || properties.databaseId;
@@ -612,6 +615,17 @@ export async function createPageItem({
 
   const created = await createPage(payload);
 
+  // Optionally post initial comment
+  let createdComment = null;
+  const commentText = typeof comment === 'string' ? comment : (comment?.text || comment?.content || comment?.markdown);
+  if (commentText) {
+    try {
+      createdComment = await createPageComment(created.id, { text: commentText });
+    } catch (commentErr) {
+      console.error(`Failed to add initial comment on created page ${created.id}:`, commentErr.message);
+    }
+  }
+
   // Return clean structured response
   const createdProps = {};
   for (const [pName, pVal] of Object.entries(created.properties || {})) {
@@ -629,6 +643,7 @@ export async function createPageItem({
     created_time: created.created_time || null,
     last_edited_time: created.last_edited_time || null,
     properties: createdProps,
+    comment: createdComment,
   };
 }
 
@@ -647,6 +662,7 @@ export async function updatePageItem(
     icon,
     cover,
     archived,
+    comment,
   } = {},
 ) {
   const pageId = await resolveResourceId(pageIdOrUrl);
@@ -714,6 +730,17 @@ export async function updatePageItem(
     await appendBlockChildren(pageId, blockChildren);
   }
 
+  // Optionally post comment
+  let createdComment = null;
+  const commentText = typeof comment === 'string' ? comment : (comment?.text || comment?.content || comment?.markdown);
+  if (commentText) {
+    try {
+      createdComment = await createPageComment(pageId, { text: commentText });
+    } catch (commentErr) {
+      console.error(`Failed to add comment on updated page ${pageId}:`, commentErr.message);
+    }
+  }
+
   // Return clean updated representation
   const updatedProps = {};
   for (const [pName, pVal] of Object.entries(updatedPage.properties || {})) {
@@ -732,6 +759,7 @@ export async function updatePageItem(
     created_time: updatedPage.created_time || null,
     last_edited_time: updatedPage.last_edited_time || null,
     properties: updatedProps,
+    comment: createdComment,
   };
 }
 
@@ -806,5 +834,91 @@ export async function updateDatabaseItem(databaseId, { title, description, icon,
     url: updated.url || `https://app.notion.com/${updated.id.replace(/-/g, '')}`,
     description: updated.description ? updated.description.map((t) => t.plain_text).join('') : null,
     property_names: Object.keys(updated.properties || {}),
+  };
+}
+
+/**
+ * Retrieve all unresolved comments for a page or block.
+ */
+export async function getPageComments(pageIdOrUrl) {
+  const pageId = await resolveResourceId(pageIdOrUrl);
+  const comments = [];
+  let cursor;
+  do {
+    const res = await getComments(pageId, cursor);
+    for (const c of res.results || []) {
+      const text = (c.rich_text || [])
+        .map((t) => t.plain_text || t.text?.content || '')
+        .join('');
+      comments.push({
+        id: c.id,
+        parent: c.parent,
+        discussion_id: c.discussion_id,
+        text,
+        rich_text: c.rich_text,
+        author: c.created_by?.name || (c.created_by?.type === 'person' ? 'User' : 'Notion User'),
+        author_id: c.created_by?.id || null,
+        author_avatar: c.created_by?.avatar_url || null,
+        created_time: c.created_time || null,
+        last_edited_time: c.last_edited_time || null,
+      });
+    }
+    cursor = res.has_more ? res.next_cursor : undefined;
+  } while (cursor);
+
+  comments.sort((a, b) => String(a.created_time).localeCompare(String(b.created_time)));
+  return {
+    page_id: dashedUuid(pageId),
+    comments,
+    count: comments.length,
+  };
+}
+
+/**
+ * Post a new comment to a page or reply to a discussion thread.
+ */
+export async function createPageComment(
+  pageIdOrUrl,
+  { text, content, markdown, richText, discussionId } = {},
+) {
+  const bodyText = text || content || markdown;
+  let richTextPayload = richText;
+  if (!richTextPayload && bodyText) {
+    richTextPayload = markdownToRichText(bodyText);
+  }
+  if (!richTextPayload || richTextPayload.length === 0) {
+    throw new Error('Comment text cannot be empty');
+  }
+
+  const payload = {
+    rich_text: richTextPayload,
+  };
+
+  if (discussionId) {
+    payload.discussion_id = discussionId;
+  } else {
+    if (!pageIdOrUrl) throw new Error('pageId is required when discussionId is not provided');
+    const pageId = await resolveResourceId(pageIdOrUrl);
+    payload.parent = {
+      type: 'page_id',
+      page_id: dashedUuid(pageId),
+    };
+  }
+
+  const res = await createComment(payload);
+  const plain = (res.rich_text || [])
+    .map((t) => t.plain_text || t.text?.content || '')
+    .join('');
+
+  return {
+    id: res.id,
+    parent: res.parent,
+    discussion_id: res.discussion_id,
+    text: plain,
+    rich_text: res.rich_text,
+    author: res.created_by?.name || (res.created_by?.type === 'person' ? 'User' : 'Notion User'),
+    author_id: res.created_by?.id || null,
+    author_avatar: res.created_by?.avatar_url || null,
+    created_time: res.created_time || null,
   };
 }

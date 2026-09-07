@@ -13,6 +13,8 @@ import {
   archivePageItem,
   createDatabaseItem,
   updateDatabaseItem,
+  getPageComments,
+  createPageComment,
 } from './src/mutation.js';
 import { NotionError } from './src/notion.js';
 
@@ -122,6 +124,25 @@ const handleUpdatePage = wrap(async (req, res) => {
 app.patch('/api/pages/:id', handleUpdatePage);
 app.put('/api/pages/:id', handleUpdatePage);
 
+/** Retrieve all comments for a page/item */
+app.get('/api/pages/:id/comments', wrap(async (req, res) => {
+  const result = await getPageComments(req.params.id);
+  res.json(result);
+}));
+
+/** Post a new comment to a page/item */
+app.post('/api/pages/:id/comments', wrap(async (req, res) => {
+  const result = await createPageComment(req.params.id, req.body || {});
+  res.status(201).json(result);
+}));
+
+/** General comments endpoint (create or reply to thread) */
+app.post('/api/comments', wrap(async (req, res) => {
+  const pageId = req.body?.pageId || req.body?.page_id;
+  const result = await createPageComment(pageId, req.body || {});
+  res.status(201).json(result);
+}));
+
 /** Archive (soft delete) a page or database item */
 app.delete('/api/pages/:id', wrap(async (req, res) => {
   const result = await archivePageItem(req.params.id);
@@ -153,5 +174,6 @@ app.listen(PORT, () => {
   console.log(`  create page API  http://localhost:${PORT}/api/pages (POST)`);
   console.log(`  edit page API    http://localhost:${PORT}/api/pages/:id (PATCH)`);
   console.log(`  archive page API http://localhost:${PORT}/api/pages/:id (DELETE)`);
+  console.log(`  comments API     http://localhost:${PORT}/api/pages/:id/comments (GET, POST)`);
   console.log(`  instructions API http://localhost:${PORT}/api/filter-instructions/:id`);
 });

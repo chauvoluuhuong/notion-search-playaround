@@ -157,6 +157,7 @@ export async function filterInstructions({ databaseId, refresh = false } = {}) {
         content: 'Optional Markdown string parsed into Notion blocks (headings, lists, code, etc.)',
         icon: 'Optional emoji string (e.g. "🚀") or image URL',
         cover: 'Optional cover image URL',
+        comment: 'Optional initial comment to post to the newly created page (Markdown supported)',
       },
       example: {
         databaseId: db.id,
@@ -171,6 +172,7 @@ export async function filterInstructions({ databaseId, refresh = false } = {}) {
       body_format: {
         properties: 'Map of field names to updated values',
         appendContent: 'Optional Markdown string to append to page body',
+        comment: 'Optional comment to post to this page during update (Markdown supported)',
         archived: 'Boolean: set true to archive/trash, false to restore',
         icon: 'Optional updated emoji or image URL',
         cover: 'Optional updated cover image URL',
@@ -178,6 +180,24 @@ export async function filterInstructions({ databaseId, refresh = false } = {}) {
       example: {
         properties: sampleEditProps,
         appendContent: '- Updated status via API',
+      },
+    },
+    how_to_comment: {
+      get_comments: {
+        method: 'GET',
+        endpoint: '/api/pages/:id/comments',
+        description: 'Fetch all unresolved comments on a page or database item',
+      },
+      add_comment: {
+        method: 'POST',
+        endpoint: '/api/pages/:id/comments',
+        body_format: {
+          text: 'Comment string (Markdown supported: **bold**, *italic*, `code`, [link](url))',
+          discussionId: 'Optional discussion_id to reply to an existing comment thread',
+        },
+        example: {
+          text: 'Looks good! Verified in staging environment. 🚀',
+        },
       },
     },
     how_to_archive: {

@@ -5,18 +5,20 @@ import {
   formatIcon,
   formatCover,
   buildPageProperties,
+  getPageComments,
+  createPageComment,
 } from '../src/mutation.js';
 
 let n = 0;
-const t = (name, fn) => {
-  fn();
+const t = async (name, fn) => {
+  await fn();
   n++;
   console.log('  ok  ' + name);
 };
 
 console.log('Running Mutation & Schema Transformation tests:\n');
 
-t('converts inline markdown to rich_text objects', () => {
+await t('converts inline markdown to rich_text objects', () => {
   const rt = markdownToRichText('Hello **bold** and *italic* and `code` and [a link](https://example.com)');
   assert.ok(Array.isArray(rt));
   assert.equal(rt[0].text.content, 'Hello ');
@@ -30,7 +32,7 @@ t('converts inline markdown to rich_text objects', () => {
   assert.equal(rt[7].text.link?.url, 'https://example.com');
 });
 
-t('converts markdown headings, lists, code, and to-do items into Notion blocks', () => {
+await t('converts markdown headings, lists, code, and to-do items into Notion blocks', () => {
   const md = `# Title
 ## Subtitle
 ### Section
@@ -75,7 +77,7 @@ Regular paragraph text`;
   assert.equal(blocks[11].paragraph.rich_text[0].text.content, 'Regular paragraph text');
 });
 
-t('formats icon and cover values', () => {
+await t('formats icon and cover values', () => {
   assert.deepEqual(formatIcon('🚀'), { type: 'emoji', emoji: '🚀' });
   assert.deepEqual(formatIcon('https://example.com/icon.png'), {
     type: 'external',
@@ -90,7 +92,7 @@ t('formats icon and cover values', () => {
   assert.equal(formatCover(null), null);
 });
 
-t('transforms intuitive properties using schema definitions', () => {
+await t('transforms intuitive properties using schema definitions', () => {
   const schemaProps = [
     { name: 'Story', type: 'title' },
     { name: 'Status', type: 'status' },
@@ -174,7 +176,7 @@ t('transforms intuitive properties using schema definitions', () => {
   assert.equal(result['Created Time'], undefined);
 });
 
-t('passes raw Notion property objects through untouched', () => {
+await t('passes raw Notion property objects through untouched', () => {
   const rawInput = {
     Story: {
       title: [{ type: 'text', text: { content: 'Raw title' } }],
@@ -192,6 +194,133 @@ t('passes raw Notion property objects through untouched', () => {
   const result = buildPageProperties(rawInput, schemaProps);
   assert.deepEqual(result.Story, rawInput.Story);
   assert.deepEqual(result.CustomStatus, rawInput.CustomStatus);
+});
+
+await t('validates comment creation arguments', async () => {
+  await assert.rejects(
+    async () => {
+      await createPageComment('page-id', { text: '' });
+    },
+    { message: 'Comment text cannot be empty' },
+  );
+
+  await assert.rejects(
+    async () => {
+      await createPageComment(null, { text: 'Hello' });
+    },
+    { message: /pageId is required/ },
+  );
+});
+
+await t('formats rich text formatting for comments correctly', () => {
+  const commentRichText = markdownToRichText('Testing **bold** and `code` with [link](https://notion.so)');
+  assert.equal(commentRichText.length, 6);
+  assert.equal(commentRichText[1].text.content, 'bold');
+  assert.equal(commentRichText[1].annotations?.bold, true);
+  assert.equal(commentRichText[3].text.content, 'code');
+  assert.equal(commentRichText[3].annotations?.code, true);
+  assert.equal(commentRichText[5].text.content, 'link');
+  assert.equal(commentRichText[5].text.link?.url, 'https://notion.so');
+});
+
+await t('constructs correct Notion comment payload for page comments and thread replies', async () => {
+  const originalFetch = globalThis.fetch;
+  let capturedPayload = null;
+  let capturedUrl = null;
+
+  globalThis.fetch = async (url, opts) => {
+    capturedUrl = String(url);
+    capturedPayload = JSON.parse(opts.body);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        object: 'comment',
+        id: 'comment-123',
+        parent: capturedPayload.parent,
+        discussion_id: capturedPayload.discussion_id || 'disc-999',
+        created_time: '2026-09-07T00:00:00.000Z',
+        created_by: { id: 'user-1', name: 'Huong', type: 'person' },
+        rich_text: capturedPayload.rich_text,
+      }),
+    };
+  };
+
+  try {
+    // 1. Page comment
+    const res1 = await createPageComment('11111111-2222-3333-4444-555555555555', {
+      text: 'Great work team! **Approved**',
+    });
+    assert.equal(capturedUrl, 'https://api.notion.com/v1/comments');
+    assert.deepEqual(capturedPayload.parent, {
+      type: 'page_id',
+      page_id: '11111111-2222-3333-4444-555555555555',
+    });
+    assert.equal(capturedPayload.rich_text[0].text.content, 'Great work team! ');
+    assert.equal(capturedPayload.rich_text[1].text.content, 'Approved');
+    assert.equal(capturedPayload.rich_text[1].annotations?.bold, true);
+    assert.equal(res1.author, 'Huong');
+    assert.equal(res1.text, 'Great work team! Approved');
+
+    // 2. Thread reply
+    const res2 = await createPageComment(null, {
+      discussionId: 'disc-999',
+      text: 'Replying to existing thread',
+    });
+    assert.equal(capturedPayload.parent, undefined);
+    assert.equal(capturedPayload.discussion_id, 'disc-999');
+    assert.equal(res2.discussion_id, 'disc-999');
+    assert.equal(res2.text, 'Replying to existing thread');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await t('fetches and maps page comments with chronological ordering', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () => {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        object: 'list',
+        results: [
+          {
+            id: 'c2',
+            parent: { type: 'page_id', page_id: '11111111-2222-3333-4444-555555555555' },
+            discussion_id: 'd1',
+            created_time: '2026-09-02T10:00:00.000Z',
+            created_by: { id: 'u2', name: 'Alice', type: 'person' },
+            rich_text: [{ type: 'text', text: { content: 'Second comment' } }],
+          },
+          {
+            id: 'c1',
+            parent: { type: 'page_id', page_id: '11111111-2222-3333-4444-555555555555' },
+            discussion_id: 'd1',
+            created_time: '2026-09-01T10:00:00.000Z',
+            created_by: { id: 'u1', name: 'Bob', type: 'person' },
+            rich_text: [{ type: 'text', text: { content: 'First comment' } }],
+          },
+        ],
+        has_more: false,
+      }),
+    };
+  };
+
+  try {
+    const res = await getPageComments('11111111-2222-3333-4444-555555555555');
+    assert.equal(res.count, 2);
+    // Chronological sort: c1 (Sept 1) comes before c2 (Sept 2)
+    assert.equal(res.comments[0].id, 'c1');
+    assert.equal(res.comments[0].author, 'Bob');
+    assert.equal(res.comments[0].text, 'First comment');
+    assert.equal(res.comments[1].id, 'c2');
+    assert.equal(res.comments[1].author, 'Alice');
+    assert.equal(res.comments[1].text, 'Second comment');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 console.log(`\nAll ${n} mutation tests passed successfully!\n`);
