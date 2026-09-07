@@ -279,6 +279,8 @@ function shapeGeneric(page, schema, body, comments) {
   return {
     id: page.id,
     url: page.url,
+    icon: page.icon || null,
+    cover: page.cover || null,
     title: titleVal,
     task_name: titleVal, // backwards compatibility
     properties: shapedProps,

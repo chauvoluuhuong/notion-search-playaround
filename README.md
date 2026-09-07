@@ -17,6 +17,9 @@ npm start        # http://localhost:3100
 | Web Interface | http://localhost:3100/ |
 | Resource Discovery (Pages & Databases) | `GET /api/resources` (supports `?type=page`, `?type=database`, `?q=...`) |
 | Deep Page Content & Inline DBs | `GET /api/pages/:id` or `GET /api/resources/:id/content` |
+| Create Page / Database Item | `POST /api/pages` or `POST /api/databases/:id/pages` |
+| Edit Page / Database Item | `PATCH /api/pages/:id` |
+| Archive Page / Database Item | `DELETE /api/pages/:id` |
 | Database Discovery | `GET /api/databases` |
 | Filter Instructions / Capabilities | `GET /api/filter-instructions/:id` or `GET /api/filter-instructions` |
 | Filter Capability & Schema API | `GET /api/filters/:id` or `GET /api/filters?database_id=<id>` |
@@ -254,9 +257,73 @@ curl -X POST "http://localhost:3100/api/search" \
 
 ---
 
-## 6. Web UI Features
+## 6. Create & Edit API (`POST /api/pages`, `PATCH /api/pages/:id`, `DELETE /api/pages/:id`)
+
+The API allows creating and updating Notion pages and database records without wrestling with complex Notion property wrappers. The mutation engine automatically matches against the database schema, casts numbers/booleans, maps select and status options, resolves user names and relation titles to UUIDs, converts markdown to native Notion blocks, and excludes computed/read-only fields.
+
+### Create a Database Item (`POST /api/pages` or `POST /api/databases/:id/pages`)
+
+```bash
+curl -X POST "http://localhost:3100/api/pages" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "databaseId": "9d483ce4-2747-4ea3-a741-bc9a2bc98c4e",
+    "properties": {
+      "Story": "Implement Single Sign-On (SSO)",
+      "Status": "In progress",
+      "Priority": "P1",
+      "Estimate (pts)": 5,
+      "Due": "2026-09-20",
+      "Assignee": "chauvoluuhuong"
+    },
+    "content": "## Implementation Details\n- Configure SAML provider\n- Support Okta and Google\n- Automatic conversion to native blocks",
+    "icon": "🔐"
+  }'
+```
+
+### Create a Subpage (`POST /api/pages`)
+
+```bash
+curl -X POST "http://localhost:3100/api/pages" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pageId": "276800dd-8789-81bc-a8b5-000b0f9f30b9",
+    "title": "API Documentation Notes",
+    "content": "# API Notes\nThis is a subpage created via the Notion Create API.",
+    "icon": "📄"
+  }'
+```
+
+### Edit an Existing Item (`PATCH /api/pages/:id`)
+
+```bash
+curl -X PATCH "http://localhost:3100/api/pages/<PAGE_ID>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "properties": {
+      "Status": "Done",
+      "Priority": "P0",
+      "Estimate (pts)": 8
+    },
+    "appendContent": "- Completed code review and QA testing",
+    "icon": "✅"
+  }'
+```
+
+### Archive (Soft-Delete) an Item (`DELETE /api/pages/:id`)
+
+```bash
+curl -X DELETE "http://localhost:3100/api/pages/<PAGE_ID>"
+```
+
+---
+
+## 7. Web UI Features
 
 - **Database Switcher:** Dropdown in the header to switch between any discovered database on the fly.
+- **➕ New Item Modal:** Open interactive modal to create a new page/row in the selected database with dynamically rendered form controls matching the database schema.
+- **✏️ Edit Item Modal:** Edit any item directly from its search result card, modify properties, append markdown content, or archive/delete the record.
+- **Raw JSON & Live Form Synced Views:** Switch between visual form fields and live-synced JSON request payloads for fast developer/agent API testing.
 - **Dynamic Filter Controls:** Form inputs automatically generate according to the selected database's schema (Select / Multi-select / Status with Notion colors and counts, People user pickers, Relation target pickers, Number comparisons, Date selectors, and Checkboxes).
 - **Active Filter Chips:** Shows active filters with individual `×` removal and a "Clear all" button.
 - **Dynamic Result Cards:** Displays all properties of each result with Notion colors, people avatars, relation links, page body excerpts, and comment threads.
@@ -264,13 +331,15 @@ curl -X POST "http://localhost:3100/api/search" \
 
 ---
 
-## 7. Running Tests
+## 8. Running Tests
 
 ```bash
 npm test
 ```
 
 Runs the test suite verifying:
+- Schema-aware property transformations and mutation engine (`test/create-edit.test.mjs`)
+- Markdown to Notion blocks & rich text parsing
 - Resource discovery & type filtering (`listResources`)
 - Single page & inline database content extraction (`getResourceContent`)
 - Database discovery (`listDatabases`)

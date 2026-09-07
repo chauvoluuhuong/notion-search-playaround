@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Notion Generic Database Search & Filter</title>
+<title>Notion Generic Database Search, Filter & Create</title>
 <style>
   :root {
     --bg: #f8fafc;
@@ -24,6 +24,7 @@
     --radius-sm: 8px;
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     --transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -47,6 +48,7 @@
   }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     background: var(--bg);
@@ -65,7 +67,7 @@
 
   /* Header */
   header {
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
   .header-top {
     display: flex;
@@ -96,22 +98,18 @@
   .header-links {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     font-size: 13px;
   }
-  .header-links a, .header-links button {
+  .header-links a {
     color: var(--muted);
     text-decoration: none;
-    background: none;
-    border: 0;
-    padding: 0;
-    cursor: pointer;
-    font: inherit;
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    transition: var(--transition);
   }
-  .header-links a:hover, .header-links button:hover {
+  .header-links a:hover {
     color: var(--accent);
     text-decoration: underline;
   }
@@ -139,7 +137,7 @@
   }
   .db-select-wrap {
     flex: 1;
-    min-width: 240px;
+    min-width: 260px;
     display: flex;
     gap: 10px;
     align-items: center;
@@ -174,67 +172,206 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    white-space: nowrap;
   }
   .btn-refresh:hover {
     background: var(--chip-hover);
   }
   .db-meta-badge {
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--muted);
     display: flex;
     align-items: center;
     gap: 8px;
   }
 
-  /* Main Filter Panel */
+  /* Main Navigation Tabs */
+  .main-nav-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+  }
+  .main-nav-btn {
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .main-nav-btn:hover {
+    color: var(--ink);
+    background: var(--chip);
+  }
+  .main-nav-btn.active {
+    background: var(--panel);
+    color: var(--accent);
+    border-color: var(--line);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Panels */
   .panel {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 20px;
+    padding: 22px;
     box-shadow: var(--shadow-sm);
+    margin-bottom: 24px;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .panel-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-subtitle {
+    font-size: 13px;
+    color: var(--muted);
   }
 
+  /* Search row */
   .searchrow {
     display: flex;
     gap: 10px;
   }
-  .searchrow input[type=search] {
+  .searchrow input {
     flex: 1;
-    min-width: 0;
-    padding: 12px 16px;
     font-size: 15px;
-    border: 1px solid var(--line);
+    padding: 12px 16px;
     border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
     background: var(--bg);
     color: var(--ink);
+    outline: none;
     transition: var(--transition);
   }
-  .searchrow input[type=search]:focus {
-    outline: none;
+  .searchrow input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    box-shadow: 0 0 0 2px var(--accent-soft);
   }
-  button {
-    font: inherit;
-    cursor: pointer;
+
+  /* Buttons */
+  button.primary, .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: 0;
+    padding: 10px 18px;
     border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+  }
+  button.primary:hover, .btn-primary:hover {
+    background: var(--accent-hover);
+  }
+  .btn-secondary {
+    background: var(--chip);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-secondary:hover {
+    background: var(--chip-hover);
+  }
+  .btn-danger {
+    background: #ef4444;
+    color: #fff;
+    border: 0;
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+  }
+  .btn-danger:hover {
+    background: #dc2626;
+  }
+  .btn-card-edit {
+    padding: 6px 13px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+    white-space: nowrap;
+  }
+  .btn-card-edit:hover {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    box-shadow: var(--shadow-sm);
+  }
+  .btn-chip-emoji {
     border: 1px solid var(--line);
     background: var(--panel);
-    color: var(--ink);
-    padding: 10px 16px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
     transition: var(--transition);
+    line-height: 1;
   }
-  button.primary {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-    font-weight: 600;
-    padding: 12px 24px;
+  .btn-chip-emoji:hover {
+    background: var(--chip-hover);
+    transform: scale(1.1);
   }
-  button.primary:hover {
-    background: var(--accent-hover);
-    border-color: var(--accent-hover);
+  .emoji-presets {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .field-hint {
+    font-size: 11.5px;
+    color: var(--muted);
+    font-weight: normal;
+    text-transform: none;
+    margin-top: 3px;
+    display: block;
   }
 
   /* Filter Grid */
@@ -282,7 +419,6 @@
     font-weight: 600;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
   }
   .clearbtn[hidden] { display: none; }
   .clearbtn:hover { text-decoration: underline; }
@@ -299,12 +435,11 @@
     transition: var(--transition);
   }
   select:focus {
-    outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 2px var(--accent-soft);
   }
   select[multiple] {
-    height: 118px;
+    min-height: 110px;
   }
 
   .number-filter-wrap {
@@ -312,20 +447,11 @@
     gap: 6px;
   }
   .number-filter-wrap select {
-    width: 75px;
+    width: 70px;
     flex-shrink: 0;
   }
-  .number-filter-wrap input[type=number] {
+  .number-filter-wrap input {
     flex: 1;
-    min-width: 0;
-    padding: 8px 10px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-sm);
-    background: var(--bg);
-    color: var(--ink);
-  .grid input[type=text],
-  .grid input[type=date] {
-    width: 100%;
     padding: 9px 10px;
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
@@ -333,115 +459,84 @@
     color: var(--ink);
     font: inherit;
     font-size: 13.5px;
-    transition: var(--transition);
-  }
-  .grid input[type=text]:focus,
-  .grid input[type=date]:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-soft);
   }
 
   /* Active Filter Chips */
   .active-bar {
     display: flex;
-    flex-wrap: wrap;
     gap: 8px;
-    align-items: center;
-    margin-top: 18px;
+    flex-wrap: wrap;
+    margin-top: 16px;
     padding-top: 14px;
-    border-top: 1px dashed var(--line);
+    border-top: 1px solid var(--line);
   }
   .active-bar:empty { display: none; }
-  .active-bar .lead {
-    font-size: 11.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
-    font-weight: 600;
-  }
-  .fchip {
+  .chip {
+    background: var(--chip);
+    border: 1px solid var(--line);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12.5px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: var(--accent-soft);
-    color: var(--accent);
-    border: 1px solid var(--accent-border);
-    border-radius: 999px;
-    padding: 4px 8px 4px 12px;
-    font-size: 12.5px;
-    font-weight: 500;
   }
-  .fchip span.k {
-    opacity: 0.75;
-    font-weight: 600;
-  }
-  .fchip button {
-    border: 0;
+  .chip b { font-weight: 600; color: var(--muted); }
+  .chip-remove {
     background: none;
-    color: inherit;
-    cursor: pointer;
-    padding: 0 4px;
-    font-size: 15px;
-    line-height: 1;
-    border-radius: 999px;
-    opacity: 0.7;
-  }
-  .fchip button:hover {
-    opacity: 1;
-    background: rgba(0, 0, 0, 0.1);
-  }
-  .clearall {
     border: 0;
-    background: none;
     color: var(--muted);
-    font-size: 12.5px;
     cursor: pointer;
-    text-decoration: underline;
-    padding: 4px 8px;
+    padding: 0 2px;
+    font-size: 14px;
+    line-height: 1;
   }
-  .clearall:hover {
-    color: var(--ink);
-  }
+  .chip-remove:hover { color: var(--ink); }
 
-  /* Actions */
   .actions {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-top: 18px;
+    margin-top: 16px;
     flex-wrap: wrap;
   }
-  .spacer { flex: 1; }
-  .hint { font-size: 13px; color: var(--muted); }
-
-  /* Results Meta */
-  .meta-bar {
+  .actions button {
+    font-size: 13px;
+    background: none;
+    border: 0;
+    padding: 0;
     color: var(--muted);
-    font-size: 13.5px;
-    margin: 24px 0 14px;
+    cursor: pointer;
+  }
+  .actions button:hover { color: var(--accent); text-decoration: underline; }
+  .spacer { flex: 1; }
+  .hint { font-size: 12.5px; color: var(--muted); }
+
+  /* Results meta */
+  .meta-bar {
     display: flex;
-    gap: 12px;
     align-items: center;
     justify-content: space-between;
+    margin: 24px 0 16px;
     flex-wrap: wrap;
+    gap: 10px;
   }
   .meta-count {
+    font-size: 15px;
     font-weight: 600;
-    color: var(--ink);
   }
 
-  /* Cards */
+  /* Result cards */
   .results-grid {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
   }
   .card {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 18px 22px;
+    padding: 18px 20px;
     box-shadow: var(--shadow-sm);
     transition: var(--transition);
     display: flex;
@@ -451,7 +546,6 @@
   .card:hover {
     border-color: var(--accent-border);
     box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
   }
   .card-header {
     display: flex;
@@ -476,7 +570,6 @@
     font-size: 17px;
     font-weight: 700;
     line-height: 1.35;
-    letter-spacing: -0.01em;
   }
   .card h3 a {
     color: var(--ink);
@@ -490,7 +583,7 @@
   .card-meta-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-wrap: wrap;
   }
   .card-time {
@@ -502,7 +595,6 @@
     gap: 4px;
   }
 
-  /* Separated Key-Value Fields Grid */
   .fields-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
@@ -517,10 +609,6 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    transition: var(--transition);
-  }
-  .field-box:hover {
-    border-color: var(--accent-border);
   }
   .field-name {
     font-size: 11px;
@@ -548,65 +636,59 @@
     align-items: center;
     gap: 6px;
     border: 1px solid transparent;
-    border-radius: 6px;
     padding: 2px 8px;
+    border-radius: 999px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
+    white-space: nowrap;
   }
-
-  /* Notion colors */
-  .pill-gray { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
-  .pill-blue { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
-  .pill-green { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
-  .pill-yellow { background: #fefce8; color: #854d0e; border-color: #fef08a; }
-  .pill-orange { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
-  .pill-red { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
-  .pill-purple { background: #faf5ff; color: #6b21a8; border-color: #e9d5ff; }
-  .pill-pink { background: #fdf2f8; color: #9d174d; border-color: #fbcfe8; }
-
-  @media (prefers-color-scheme: dark) {
-    .pill-gray { background: #1f2937; color: #e5e7eb; border-color: #374151; }
-    .pill-blue { background: #172554; color: #bfdbfe; border-color: #1e3a8a; }
-    .pill-green { background: #052e16; color: #bbf7d0; border-color: #14532d; }
-    .pill-yellow { background: #422006; color: #fef08a; border-color: #713f12; }
-    .pill-orange { background: #431407; color: #fed7aa; border-color: #7c2d12; }
-    .pill-red { background: #450a0a; color: #fecaca; border-color: #7f1d1d; }
-    .pill-purple { background: #3b0764; color: #e9d5ff; border-color: #581c87; }
-    .pill-pink { background: #500724; color: #fbcfe8; border-color: #831843; }
+  .prop-pill::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.8;
   }
+  .pill-default { background: var(--chip); color: var(--ink); border-color: var(--line); }
+  .pill-gray    { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+  .pill-brown   { background: #fdf8f6; color: #7c2d12; border-color: #fed7aa; }
+  .pill-orange  { background: #fff7ed; color: #c2410c; border-color: #ffedd5; }
+  .pill-yellow  { background: #fefce8; color: #854d0e; border-color: #fef08a; }
+  .pill-green   { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+  .pill-blue    { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+  .pill-purple  { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
+  .pill-pink    { background: #fdf2f8; color: #be185d; border-color: #fbcfe8; }
+  .pill-red     { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 
-  /* Search match highlights */
   .match-banner {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
-    border-radius: 8px;
     background: var(--accent-soft);
     border: 1px solid var(--accent-border);
+    border-radius: var(--radius-sm);
     font-size: 12px;
     color: var(--accent);
-    font-weight: 600;
     flex-wrap: wrap;
   }
   .match-tag {
     background: var(--panel);
     border: 1px solid var(--accent-border);
-    color: var(--accent);
+    padding: 2px 7px;
     border-radius: 999px;
-    padding: 2px 9px;
-    font-size: 11px;
     font-weight: 600;
   }
 
-  /* Content sections */
   .card-section {
     background: var(--panel-sub);
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
-    padding: 12px 14px;
+    padding: 10px 14px;
     font-size: 13.5px;
-    line-height: 1.5;
+    line-height: 1.55;
   }
   .card-section-title {
     font-size: 11px;
@@ -614,14 +696,13 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--muted);
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    margin-bottom: 4px;
   }
 
-  /* Comments */
   .comments-wrap {
+    margin-top: 4px;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -629,18 +710,17 @@
   .comment-item {
     background: var(--panel-sub);
     border: 1px solid var(--line);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    padding: 10px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    font-size: 13px;
   }
   .comment-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 12px;
+    margin-bottom: 4px;
+    font-size: 11.5px;
+    color: var(--muted);
   }
   .comment-author {
     font-weight: 600;
@@ -650,96 +730,285 @@
     gap: 6px;
   }
   .comment-avatar {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
-    background: var(--accent);
-    color: #fff;
+    background: var(--accent-soft);
+    color: var(--accent);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
   }
   .comment-tag-inline {
-    font-size: 10.5px;
-    padding: 1px 5px;
+    font-size: 10px;
     background: var(--chip);
-    border: 1px solid var(--line);
+    padding: 1px 5px;
     border-radius: 4px;
-    color: var(--muted);
   }
-  .comment-time {
-    font-size: 11.5px;
-    color: var(--muted);
+
+  /* Form & Mutation Controls */
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
   }
-  .comment-body {
-    font-size: 13px;
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .form-group.full-width {
+    grid-column: 1 / -1;
+  }
+  .form-group label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .form-group label .prop-type-badge {
+    font-size: 11px;
+    text-transform: none;
+    font-weight: 500;
+    color: var(--muted);
+    background: var(--chip);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .form-control {
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--bg);
     color: var(--ink);
-    line-height: 1.45;
+    outline: none;
+    font-family: inherit;
+    transition: var(--transition);
+    width: 100%;
+  }
+  .form-control:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+  textarea.form-control {
+    min-height: 90px;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .form-checkbox-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .form-checkbox-wrap input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent);
   }
 
-  mark {
-    background: var(--mark);
-    color: inherit;
-    border-radius: 3px;
-    padding: 0 3px;
+  .api-feedback-box {
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    background: var(--bg);
+  }
+  .api-feedback-box.success {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #166534;
+  }
+  .api-feedback-box.error {
+    border-color: #fca5a5;
+    background: #fef2f2;
+    color: #991b1b;
+  }
+
+  .subtabs-nav {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+  }
+  .subtab-btn {
+    padding: 6px 12px;
+    font-size: 13px;
     font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .subtab-btn.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent-border);
   }
 
-  .empty {
-    padding: 48px;
-    text-align: center;
+  /* Edit Modal Overlay */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .modal-container {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    max-width: 760px;
+    width: 100%;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    transform: scale(0.96);
+    transition: transform 0.2s ease;
+  }
+  .modal-overlay.open .modal-container {
+    transform: scale(1);
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .modal-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .modal-close {
+    background: none;
+    border: 0;
+    font-size: 20px;
     color: var(--muted);
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .modal-close:hover {
+    color: var(--ink);
+    background: var(--chip);
+  }
+  .modal-body {
+    padding: 22px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+    border-top: 1px solid var(--line);
+    background: var(--panel-sub);
+    gap: 12px;
+  }
+
+  /* Capabilities View */
+  .capabilities-pre {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: auto;
+  }
+
+  /* Empty state & debug */
+  .empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 15px;
     background: var(--panel);
     border: 1px dashed var(--line);
     border-radius: var(--radius);
   }
-
-  /* Debug details */
-  details.debug {
-    margin-top: 24px;
-    font-size: 13px;
-    color: var(--muted);
-  }
-  details.debug summary {
-    cursor: pointer;
-    font-weight: 600;
-    padding: 6px 0;
-  }
-  details.debug pre {
-    background: var(--panel-sub);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-sm);
-    padding: 14px;
-    overflow: auto;
-    font-size: 12px;
-    color: var(--ink);
-    line-height: 1.4;
-  }
-
   .err {
-    background: #fee2e2;
-    border: 1px solid #fca5a5;
-    color: #991b1b;
     padding: 14px 18px;
     border-radius: var(--radius-sm);
-    margin-bottom: 16px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    font-size: 14px;
+    margin: 16px 0;
   }
-  @media (prefers-color-scheme: dark) {
-    .err { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; }
+  .debug {
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--muted);
   }
-
+  .debug pre {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+  }
   .loading-spinner {
     display: inline-block;
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(0,0,0,0.2);
+    border: 2px solid var(--line);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
     vertical-align: middle;
     margin-right: 6px;
+  }
+  .loading-spinner[hidden] {
+    display: none !important;
+  }
+  .btn-primary .loading-spinner,
+  button.primary .loading-spinner {
+    border-color: rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+  }
+  .btn-secondary .loading-spinner {
+    border-color: var(--line);
+    border-top-color: var(--ink);
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -749,7 +1018,7 @@
   <header>
     <div class="header-top">
       <h1 class="app-title">
-        <span>⚡ Notion Universal Search & Filter</span>
+        <span>⚡ Notion Universal Search, Filter & Mutation</span>
         <span class="badge">Generic Schema</span>
       </h1>
       <div class="header-links">
@@ -759,7 +1028,7 @@
     </div>
   </header>
 
-  <!-- Database Selector -->
+  <!-- Database Selector Bar -->
   <div class="db-bar">
     <span class="db-label">Database</span>
     <div class="db-select-wrap">
@@ -771,40 +1040,226 @@
     <div class="db-meta-badge" id="db-meta-badge"></div>
   </div>
 
-  <form class="panel" id="form">
-    <div class="searchrow">
-      <input type="search" id="q" name="q" placeholder="Free text search across all fields, page body & comments..." autocomplete="off">
-      <button class="primary" type="submit">Search</button>
-    </div>
-
-    <!-- Dynamically rendered filter controls -->
-    <div class="grid" id="filters-grid"></div>
-
-    <!-- Active filter chips -->
-    <div class="active-bar" id="active-bar"></div>
-
-    <div class="actions">
-      <button type="button" id="btn-clear-all">Clear all filters</button>
-      <span class="spacer"></span>
-      <span class="hint">Hold ⌘/Ctrl to select multiple options. Changes filter dynamically.</span>
-    </div>
-  </form>
-
-  <div class="meta-bar">
-    <div class="meta-count" id="meta-count">Loading databases…</div>
-    <div id="meta-sub"></div>
+  <!-- Main View Navigation Tabs -->
+  <div class="main-nav-tabs">
+    <button type="button" class="main-nav-btn active" id="tab-nav-search">🔍 Search & Filter</button>
+    <button type="button" class="main-nav-btn" id="tab-nav-create">➕ Create New Item</button>
+    <button type="button" class="main-nav-btn" id="tab-nav-docs">📋 API Capabilities & Schema</button>
   </div>
 
-  <div id="results" class="results-grid"></div>
+  <!-- VIEW 1: SEARCH & FILTER -->
+  <div id="view-search">
+    <form class="panel" id="form">
+      <div class="searchrow">
+        <input type="search" id="q" name="q" placeholder="Free text search across all fields, page body & comments..." autocomplete="off">
+        <button class="primary" type="submit">Search</button>
+      </div>
 
-  <div class="actions" id="morewrap" hidden>
-    <button id="btn-load-more" class="primary">Load the remaining results</button>
+      <!-- Dynamically rendered filter controls -->
+      <div class="grid" id="filters-grid"></div>
+
+      <!-- Active filter chips -->
+      <div class="active-bar" id="active-bar"></div>
+
+      <div class="actions">
+        <button type="button" id="btn-clear-all">Clear all filters</button>
+        <span class="spacer"></span>
+        <span class="hint">Hold ⌘/Ctrl to select multiple options. Changes filter dynamically.</span>
+      </div>
+    </form>
+
+    <div class="meta-bar">
+      <div class="meta-count" id="meta-count">Loading databases…</div>
+      <div id="meta-sub">
+        <button type="button" class="btn-primary" id="btn-quick-create-switch" style="font-size: 13px; padding: 6px 12px;">
+          ➕ Create Item in this Database
+        </button>
+      </div>
+    </div>
+
+    <div id="results" class="results-grid"></div>
+
+    <div class="actions" id="morewrap" hidden>
+      <button id="btn-load-more" class="primary">Load the remaining results</button>
+    </div>
+
+    <details class="debug" id="debugwrap" hidden>
+      <summary>Query Execution & Filter Details</summary>
+      <pre id="debug"></pre>
+    </details>
   </div>
 
-  <details class="debug" id="debugwrap" hidden>
-    <summary>Query Execution & Filter Details</summary>
-    <pre id="debug"></pre>
-  </details>
+  <!-- VIEW 2: CREATE NEW ITEM (STAYS VISIBLE ON PAGE, NEVER DISAPPEARS) -->
+  <div id="view-create" hidden>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title" id="create-panel-title">➕ Create New Item</h2>
+          <div class="panel-subtitle" id="create-panel-subtitle">The schema dynamically adapts to the selected database. You can also switch databases right here.</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <label for="create-db-select" style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase;">Database:</label>
+          <select id="create-db-select" class="db-select" style="min-width:240px; padding:6px 10px; font-size:13.5px;" title="Switch target database"></select>
+          <div class="subtabs-nav" style="margin-bottom: 0; border-bottom: 0;">
+            <button type="button" class="subtab-btn active" id="create-subtab-form">📝 Visual Form</button>
+            <button type="button" class="subtab-btn" id="create-subtab-json">{ } Raw JSON</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="create-container-form">
+        <form id="create-form" onsubmit="return false;">
+          <div class="form-grid" id="create-form-fields"></div>
+
+          <div class="form-group full-width" style="margin-top: 18px;">
+            <label for="create-field-content">
+              <span>Page Content / Body Notes (Markdown)</span>
+              <span class="prop-type-badge">native Notion blocks</span>
+            </label>
+            <textarea id="create-field-content" class="form-control" rows="4" placeholder="## Implementation Notes&#10;- Supports **bold**, *italic*, `code`, checklists&#10;- Parsed automatically into native Notion blocks"></textarea>
+          </div>
+
+          <div class="form-grid" style="margin-top: 14px;">
+            <div class="form-group">
+              <label for="create-field-icon">
+                <span>Icon</span>
+                <span class="prop-type-badge">emoji or image URL</span>
+              </label>
+              <input type="text" id="create-field-icon" class="form-control" placeholder="e.g. 🚀, 📝, or https://...">
+              <div class="emoji-presets" data-target="create-field-icon">
+                <button type="button" class="btn-chip-emoji" data-emoji="🎯" title="Target">🎯</button>
+                <button type="button" class="btn-chip-emoji" data-emoji="⚡" title="Lightning">⚡</button>
+                <button type="button" class="btn-chip-emoji" data-emoji="🚀" title="Rocket">🚀</button>
+                <button type="button" class="btn-chip-emoji" data-emoji="📝" title="Memo">📝</button>
+                <button type="button" class="btn-chip-emoji" data-emoji="✅" title="Checkmark">✅</button>
+                <button type="button" class="btn-chip-emoji" data-emoji="💡" title="Idea">💡</button>
+                <button type="button" class="btn-chip-emoji" data-emoji="🔥" title="Fire">🔥</button>
+                <button type="button" class="btn-chip-emoji" data-emoji="🐛" title="Bug">🐛</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="create-field-cover">
+                <span>Cover Image</span>
+                <span class="prop-type-badge">image URL</span>
+              </label>
+              <input type="url" id="create-field-cover" class="form-control" placeholder="https://images.unsplash.com/...">
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line);">
+            <button type="button" class="btn-secondary" id="create-btn-reset">Reset Form</button>
+            <span class="spacer"></span>
+            <button type="button" class="btn-primary" id="create-btn-submit">
+              <span id="create-spinner" class="loading-spinner" hidden></span>
+              <span id="create-submit-label">🚀 Create in Notion</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div id="create-container-json" hidden>
+        <div class="form-group">
+          <label for="create-raw-json">
+            <span>JSON Payload (Live Synced)</span>
+            <span class="prop-type-badge">POST /api/pages</span>
+          </label>
+          <textarea id="create-raw-json" class="form-control" rows="14" spellcheck="false"></textarea>
+        </div>
+        <div class="actions" style="margin-top: 16px;">
+          <span class="spacer"></span>
+          <button type="button" class="btn-primary" id="create-btn-submit-json">🚀 Send JSON to /api/pages</button>
+        </div>
+      </div>
+
+      <div id="create-api-feedback" class="api-feedback-box" hidden></div>
+    </div>
+  </div>
+
+  <!-- VIEW 3: API CAPABILITIES & SCHEMA -->
+  <div id="view-docs" hidden>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">📋 Self-Describing Schema & Capability Document</h2>
+          <div class="panel-subtitle">Detailed documentation generated by the API for AI agents and developers.</div>
+        </div>
+        <div>
+          <a id="docs-raw-link" href="#" target="_blank" class="btn-secondary" style="text-decoration:none;">Open JSON Endpoint ↗</a>
+        </div>
+      </div>
+      <pre class="capabilities-pre" id="docs-content">Loading capability document…</pre>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT ITEM MODAL DIALOG -->
+<div class="modal-overlay" id="edit-modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h2 class="modal-title" id="edit-modal-title">
+        <span>✏️</span>
+        <span id="edit-modal-title-text">Edit Item</span>
+      </h2>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <a id="edit-modal-notion-link" href="#" target="_blank" rel="noreferrer" class="btn-secondary" style="font-size:12px; padding:5px 10px; text-decoration:none;">Open in Notion ↗</a>
+        <button type="button" class="modal-close" id="edit-btn-close" aria-label="Close modal">✕</button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <form id="edit-form" onsubmit="return false;">
+        <div class="form-grid" id="edit-form-fields"></div>
+
+        <div class="form-group full-width" style="margin-top: 16px;">
+          <label for="edit-field-append">
+            <span>Append Page Content / Notes (Markdown)</span>
+            <span class="prop-type-badge">appends blocks</span>
+          </label>
+          <textarea id="edit-field-append" class="form-control" rows="3" placeholder="Add additional notes, checklists, or updates to this page body..."></textarea>
+        </div>
+
+        <div class="form-grid" style="margin-top: 12px;">
+          <div class="form-group">
+            <label for="edit-field-icon">
+              <span>Icon</span>
+              <span class="prop-type-badge">emoji or URL</span>
+            </label>
+            <input type="text" id="edit-field-icon" class="form-control" placeholder="e.g. 🎯">
+            <div class="emoji-presets" data-target="edit-field-icon">
+              <button type="button" class="btn-chip-emoji" data-emoji="🎯" title="Target">🎯</button>
+              <button type="button" class="btn-chip-emoji" data-emoji="⚡" title="Lightning">⚡</button>
+              <button type="button" class="btn-chip-emoji" data-emoji="🚀" title="Rocket">🚀</button>
+              <button type="button" class="btn-chip-emoji" data-emoji="📝" title="Memo">📝</button>
+              <button type="button" class="btn-chip-emoji" data-emoji="✅" title="Checkmark">✅</button>
+              <button type="button" class="btn-chip-emoji" data-emoji="💡" title="Idea">💡</button>
+              <button type="button" class="btn-chip-emoji" data-emoji="🔥" title="Fire">🔥</button>
+              <button type="button" class="btn-chip-emoji" data-emoji="🐛" title="Bug">🐛</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit-field-cover">
+              <span>Cover Image</span>
+              <span class="prop-type-badge">image URL</span>
+            </label>
+            <input type="url" id="edit-field-cover" class="form-control" placeholder="https://...">
+          </div>
+        </div>
+      </form>
+
+      <div id="edit-api-feedback" class="api-feedback-box" hidden></div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-danger" id="edit-btn-archive">🗑️ Archive Item</button>
+      <div style="display:flex; gap:10px;">
+        <button type="button" class="btn-secondary" id="edit-btn-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="edit-btn-submit">
+          <span id="edit-spinner" class="loading-spinner" hidden></span>
+          <span id="edit-submit-label">💾 Save Changes</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script type="module">
@@ -833,8 +1288,34 @@ let DATABASES = [];
 let ACTIVE_DB_ID = null;
 let ACTIVE_SCHEMA = null;
 let ACTIVE_FILTER_DOC = null;
-let LABELS = {}; // filter key -> { id: label }
+let LABELS = {};
 let SEARCH_TOKEN = 0;
+let ACTIVE_MAIN_TAB = 'search'; // 'search' | 'create' | 'docs'
+let EDITING_ITEM = null;
+
+// ---------- Tab Switching ----------
+
+function setMainTab(tab) {
+  ACTIVE_MAIN_TAB = tab;
+  $('#tab-nav-search').classList.toggle('active', tab === 'search');
+  $('#tab-nav-create').classList.toggle('active', tab === 'create');
+  $('#tab-nav-docs').classList.toggle('active', tab === 'docs');
+
+  $('#view-search').hidden = tab !== 'search';
+  $('#view-create').hidden = tab !== 'create';
+  $('#view-docs').hidden = tab !== 'docs';
+
+  if (tab === 'create') {
+    renderCreateForm();
+  } else if (tab === 'docs') {
+    renderDocsView();
+  }
+}
+
+$('#tab-nav-search').onclick = () => setMainTab('search');
+$('#tab-nav-create').onclick = () => setMainTab('create');
+$('#tab-nav-docs').onclick = () => setMainTab('docs');
+$('#btn-quick-create-switch').onclick = () => setMainTab('create');
 
 // ---------- Initialization ----------
 
@@ -851,10 +1332,13 @@ async function loadDatabases(refresh = false) {
 
     DATABASES = data.databases || [];
     const select = $('#db-select');
+    const createSelect = $('#create-db-select');
     select.innerHTML = '';
+    if (createSelect) createSelect.innerHTML = '';
 
     if (DATABASES.length === 0) {
       select.innerHTML = '<option value="">No databases found</option>';
+      if (createSelect) createSelect.innerHTML = '<option value="">No databases found</option>';
       $('#meta-count').textContent = 'No databases shared with integration.';
       return;
     }
@@ -865,28 +1349,51 @@ async function loadDatabases(refresh = false) {
       const icon = db.icon?.type === 'emoji' ? db.icon.emoji + ' ' : '📄 ';
       opt.textContent = `${icon}${db.title} (${db.properties_count} properties)`;
       select.appendChild(opt);
+
+      if (createSelect) {
+        const opt2 = document.createElement('option');
+        opt2.value = db.id;
+        opt2.textContent = `${icon}${db.title}`;
+        createSelect.appendChild(opt2);
+      }
     }
 
     if (!ACTIVE_DB_ID || !DATABASES.some((d) => d.id === ACTIVE_DB_ID)) {
       ACTIVE_DB_ID = DATABASES[0].id;
     }
     select.value = ACTIVE_DB_ID;
+    if (createSelect) createSelect.value = ACTIVE_DB_ID;
 
     select.onchange = () => {
       ACTIVE_DB_ID = select.value;
+      if (createSelect) createSelect.value = ACTIVE_DB_ID;
       switchDatabase(ACTIVE_DB_ID);
     };
 
+    if (createSelect) {
+      createSelect.onchange = () => {
+        ACTIVE_DB_ID = createSelect.value;
+        select.value = ACTIVE_DB_ID;
+        switchDatabase(ACTIVE_DB_ID);
+      };
+    }
+
     await switchDatabase(ACTIVE_DB_ID, refresh);
   } catch (err) {
-    $('#results').innerHTML = `<div class="err">${esc(err.message)}</div>`;
+    $('#results').innerHTML = `<div class="err">❌ ${esc(err.message)}</div>`;
     $('#meta-count').textContent = 'Error loading databases';
   }
 }
 
 async function switchDatabase(databaseId, refresh = false) {
+  ACTIVE_DB_ID = databaseId;
+  $('#db-select').value = databaseId;
+  const createDbSelect = $('#create-db-select');
+  if (createDbSelect) createDbSelect.value = databaseId;
+
   $('#meta-count').innerHTML = '<span class="loading-spinner"></span> Discovering schema & capabilities…';
   $('#api-filters-link').href = `/api/filter-instructions/${databaseId}`;
+  $('#docs-raw-link').href = `/api/filter-instructions/${databaseId}`;
 
   const currentDb = DATABASES.find((d) => d.id === databaseId);
   if (currentDb) {
@@ -894,12 +1401,21 @@ async function switchDatabase(databaseId, refresh = false) {
       <span>${currentDb.properties_count} properties</span> ·
       <a href="${esc(currentDb.url)}" target="_blank" rel="noreferrer">Open in Notion ↗</a>
     `;
+    $('#create-panel-title').textContent = `➕ Create New Item in "${currentDb.title}"`;
   }
 
   try {
     const [optionsRes, filtersRes] = await Promise.all([
-      fetch(`/api/options?database_id=${databaseId}${refresh ? '&refresh=1' : ''}`).then((r) => r.json()),
-      fetch(`/api/filter-instructions/${databaseId}${refresh ? '&refresh=1' : ''}`).then((r) => r.json()),
+      fetch(`/api/options?database_id=${databaseId}${refresh ? '&refresh=1' : ''}`).then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Failed to fetch options');
+        return j;
+      }),
+      fetch(`/api/filter-instructions/${databaseId}${refresh ? '&refresh=1' : ''}`).then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Failed to fetch filter instructions');
+        return j;
+      }),
     ]);
 
     ACTIVE_SCHEMA = optionsRes;
@@ -909,13 +1425,20 @@ async function switchDatabase(databaseId, refresh = false) {
     renderDynamicControls(optionsRes);
     syncControls();
     runSearch();
+
+    // If currently on Create or Docs tab, re-render it for this database!
+    if (ACTIVE_MAIN_TAB === 'create') {
+      renderCreateForm();
+    } else if (ACTIVE_MAIN_TAB === 'docs') {
+      renderDocsView();
+    }
   } catch (err) {
-    $('#results').innerHTML = `<div class="err">${esc(err.message)}</div>`;
+    $('#results').innerHTML = `<div class="err">❌ ${esc(err.message)}</div>`;
     $('#meta-count').textContent = 'Error loading schema';
   }
 }
 
-// ---------- Dynamic Control Rendering ----------
+// ---------- Dynamic Search Filter Controls ----------
 
 function renderDynamicControls(schema) {
   const grid = $('#filters-grid');
@@ -923,7 +1446,6 @@ function renderDynamicControls(schema) {
 
   const properties = schema.properties || [];
   for (const p of properties) {
-    // Skip raw free-text properties from filter dropdowns since searchText searches across all fields
     if (p.type === 'title' || p.type === 'rich_text') continue;
 
     const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
@@ -994,16 +1516,16 @@ function renderDynamicControls(schema) {
       sel.dataset.field = p.name;
       sel.dataset.slug = slug;
 
-      const noneOpt = new Option('— No relation —', 'none');
+      const noneOpt = new Option('— No Relation —', 'none');
       sel.appendChild(noneOpt);
-      LABELS[slug]['none'] = 'No relation';
+      LABELS[slug]['none'] = 'No Relation';
 
-      const targets = p.targets || schema.relations_by_property?.[p.name] || [];
-      for (const t of targets) {
-        const countTxt = t.count ? ` (${t.count})` : '';
-        const opt = new Option(`${t.label || t.title}${countTxt}`, t.title || t.label || t.id);
+      const relations = p.targets || schema.relations_by_property?.[p.name] || [];
+      for (const r of relations) {
+        const countTxt = r.count ? ` (${r.count})` : '';
+        const opt = new Option(`${r.label || r.title}${countTxt}`, r.title || r.label || r.id);
         sel.appendChild(opt);
-        LABELS[slug][t.title || t.label || t.id] = t.label || t.title;
+        LABELS[slug][r.title || r.label || r.id] = r.label || r.title;
       }
       sel.onchange = () => { syncControls(); runSearch(); };
       col.appendChild(sel);
@@ -1013,8 +1535,8 @@ function renderDynamicControls(schema) {
       sel.dataset.field = p.name;
       sel.dataset.slug = slug;
       sel.appendChild(new Option('All', ''));
-      sel.appendChild(new Option('Checked (True)', 'true'));
-      sel.appendChild(new Option('Unchecked (False)', 'false'));
+      sel.appendChild(new Option('✓ Checked', 'true'));
+      sel.appendChild(new Option('✗ Unchecked', 'false'));
       LABELS[slug]['true'] = 'Checked';
       LABELS[slug]['false'] = 'Unchecked';
       sel.onchange = () => { syncControls(); runSearch(); };
@@ -1149,67 +1671,51 @@ function syncControls() {
     }
   }
 
-  if (!chips.length) return;
-
-  bar.append(el('span', 'lead', 'Active Filters'));
   for (const c of chips) {
-    const chip = el('span', 'fchip');
-    chip.append(el('span', 'k', c.k + ':'), document.createTextNode(' ' + c.label));
-    const x = el('button', null, '×');
-    x.type = 'button';
-    x.title = `Remove ${c.k} filter`;
-    x.onclick = c.onclear;
-    chip.append(x);
-    bar.append(chip);
+    const chip = el('span', 'chip');
+    chip.innerHTML = `<b>${esc(c.k)}:</b> ${esc(c.label)}`;
+    const rm = el('button', 'chip-remove', '×');
+    rm.onclick = c.onclear;
+    chip.appendChild(rm);
+    bar.appendChild(chip);
   }
-
-  const all = el('button', 'clearall', 'Clear all');
-  all.type = 'button';
-  all.onclick = clearAll;
-  bar.append(all);
 }
 
 // ---------- Search Execution ----------
 
-function collectRequestBody(offset = 0) {
-  const body = {
-    databaseId: ACTIVE_DB_ID,
-    pageSize: PAGE_SIZE,
-    offset,
-  };
-  const q = $('#q').value.trim();
-  if (q) body.searchText = q;
-
-  const filter = {};
-  for (const p of ACTIVE_SCHEMA?.properties || []) {
-    const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-    const vals = pickedValues(slug);
-    if (vals.length) {
-      filter[p.name] = vals.length === 1 ? vals[0] : vals;
-    }
-  }
-  if (Object.keys(filter).length > 0) {
-    body.filter = filter;
-  }
-  return body;
-}
-
 async function runSearch(startOffset = 0) {
   const token = ++SEARCH_TOKEN;
   const box = $('#results');
-  if (startOffset === 0) box.innerHTML = '';
-  $('#morewrap').hidden = true;
+
+  if (startOffset === 0) {
+    box.innerHTML = '';
+    $('#morewrap').hidden = true;
+    $('#meta-count').innerHTML = '<span class="loading-spinner"></span> Searching…';
+  }
+
+  const q = $('#q').value.trim();
+  const filter = {};
+  const properties = ACTIVE_SCHEMA?.properties || [];
+
+  for (const p of properties) {
+    const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const vals = pickedValues(slug);
+    if (vals.length > 0) {
+      filter[p.name] = vals.length === 1 ? vals[0] : vals;
+    }
+  }
 
   let offset = startOffset;
-  let shown = box.querySelectorAll('.card').length;
-  const q = $('#q').value.trim();
+  let shown = startOffset;
 
-  while (true) {
-    $('#meta-count').innerHTML = shown
-      ? `<span class="loading-spinner"></span> Loaded ${shown} results…`
-      : '<span class="loading-spinner"></span> Searching…';
-
-    const body = collectRequestBody(offset);
+  while (shown < AUTO_LOAD_LIMIT) {
+    const body = {
+      databaseId: ACTIVE_DB_ID,
+      searchText: q,
+      filter,
+      pageSize: PAGE_SIZE,
+      offset,
+    };
 
     let data;
     try {
@@ -1235,12 +1741,18 @@ async function runSearch(startOffset = 0) {
     shown += (data.results || []).length;
     offset += (data.results || []).length;
 
-    $('#debugwrap').hidden = !data.filter_applied && !data.text_matching;
-    $('#debug').textContent = JSON.stringify(
-      { database: data.database, filter_applied: data.filter_applied, text_matching: data.text_matching },
-      null,
-      2,
-    );
+    const debugWrap = $('#debugwrap');
+    if (debugWrap) {
+      debugWrap.hidden = !data.filter_applied && !data.text_matching;
+      const debugEl = $('#debug');
+      if (debugEl) {
+        debugEl.textContent = JSON.stringify(
+          { database: data.database, filter_applied: data.filter_applied, text_matching: data.text_matching },
+          null,
+          2,
+        );
+      }
+    }
 
     if (data.notice) {
       $('#meta-count').textContent = data.notice;
@@ -1268,17 +1780,15 @@ async function runSearch(startOffset = 0) {
 
 // ---------- Result Card Rendering ----------
 
-// ---------- Result Card Rendering ----------
-
 function getPropertyIcon(pname, pval) {
   const n = pname.toLowerCase();
   if (n.includes('status')) return '🎯';
   if (n.includes('priority')) return '⚡';
-  if (n.includes('assignee') || n.includes('owner') || n.includes('user') || n.includes('author') || n.includes('people')) return '👤';
+  if (n.includes('assignee') || n.includes('owner') || n.includes('user') || n.includes('people')) return '👤';
   if (n.includes('epic') || n.includes('relation') || n.includes('parent') || n.includes('link')) return '🔗';
-  if (n.includes('date') || n.includes('due') || n.includes('start') || n.includes('end') || n.includes('created') || n.includes('edited')) return '📅';
+  if (n.includes('date') || n.includes('due') || n.includes('start') || n.includes('end')) return '📅';
   if (n.includes('sprint') || n.includes('iteration')) return '🏃';
-  if (n.includes('estimate') || n.includes('point') || n.includes('cost') || n.includes('number') || typeof pval === 'number') return '🔢';
+  if (n.includes('estimate') || n.includes('point') || typeof pval === 'number') return '🔢';
   if (typeof pval === 'boolean') return '☑️';
   return '🏷️';
 }
@@ -1286,17 +1796,28 @@ function getPropertyIcon(pname, pval) {
 function renderCard(r, q) {
   const card = el('div', 'card');
 
-  // Header row: Title + Last Updated Time
+  // Header row: Title + Actions + Last Updated Time
   const header = el('div', 'card-header');
   const titleWrap = el('div', 'card-title-wrap');
   
-  const iconSpan = el('span', 'card-title-icon', '📄');
+  const iconSpan = el('span', 'card-title-icon', r.icon?.emoji || '📄');
   const h3 = el('h3');
   h3.innerHTML = `<a href="${esc(r.url)}" target="_blank" rel="noreferrer">${highlight(r.title || 'Untitled', q)} <span style="font-size: 13px; opacity: 0.6;">↗</span></a>`;
   titleWrap.append(iconSpan, h3);
   header.append(titleWrap);
 
   const metaRight = el('div', 'card-meta-right');
+  
+  // Prominent Edit Button
+  const editBtn = el('button', 'btn-card-edit', '✏️ Edit');
+  editBtn.type = 'button';
+  editBtn.title = 'Edit properties or append content';
+  editBtn.onclick = (e) => {
+    e.stopPropagation();
+    openEditModal(r);
+  };
+  metaRight.append(editBtn);
+
   if (r.last_edited_time) {
     const time = el('span', 'card-time');
     time.innerHTML = `<span>🕒</span> Updated ${esc(r.last_edited_time.slice(0, 10))}`;
@@ -1316,7 +1837,7 @@ function renderCard(r, q) {
     card.append(banner);
   }
 
-  // Separated Key-Value Fields Grid
+  // Key-Value Properties Grid
   const fieldsGrid = el('div', 'fields-grid');
   let hasFields = false;
 
@@ -1334,7 +1855,7 @@ function renderCard(r, q) {
 
     const valDiv = el('div', 'field-val');
 
-    if (typeof pval === 'object' && pval.name && pval.color) {
+    if (typeof pval === 'object' && pval && pval.name && pval.color) {
       valDiv.innerHTML = `<span class="prop-pill pill-${pval.color}">${highlight(pval.name, q)}</span>`;
     } else if (Array.isArray(pval) && pval.length && pval[0]?.label) {
       valDiv.innerHTML = pval.map((x) => highlight(x.label, q)).join(', ');
@@ -1363,7 +1884,7 @@ function renderCard(r, q) {
     card.append(fieldsGrid);
   }
 
-  // Descriptions & Long text sections
+  // Long text / descriptions
   for (const [pname, pval] of Object.entries(r.properties || {})) {
     if (typeof pval === 'string' && (pval.length >= 60 || pval.includes('\n'))) {
       const sec = el('div', 'card-section');
@@ -1372,14 +1893,14 @@ function renderCard(r, q) {
     }
   }
 
-  // Page body snippet section
+  // Page body excerpt
   if (r.page_content) {
     const sec = el('div', 'card-section');
     sec.innerHTML = `<div class="card-section-title">📄 Page Content Excerpt</div><div>${highlight(r.page_content, q)}</div>`;
     card.append(sec);
   }
 
-  // Comments section
+  // Comments
   if (r.comments && r.comments.length > 0) {
     const cmtWrap = el('div', 'comments-wrap');
     const cmtHeader = el('div', 'card-section-title');
@@ -1390,27 +1911,19 @@ function renderCard(r, q) {
       const cItem = el('div', 'comment-item');
       const cHeader = el('div', 'comment-header');
       const authorWrap = el('div', 'comment-author');
-      
       const authorName = cm.author || 'Author';
-      const initial = authorName.charAt(0).toUpperCase();
-      const avatar = el('span', 'comment-avatar', initial);
+      const avatar = el('span', 'comment-avatar', authorName.charAt(0).toUpperCase());
       authorWrap.append(avatar, document.createTextNode(authorName));
-      
-      if (cm.inline) {
-        authorWrap.append(el('span', 'comment-tag-inline', 'inline'));
-      }
       cHeader.append(authorWrap);
 
       if (cm.created_time) {
-        const timeSpan = el('span', 'comment-time', cm.created_time.slice(0, 10));
-        cHeader.append(timeSpan);
+        cHeader.append(el('span', 'comment-time', cm.created_time.slice(0, 10)));
       }
       cItem.append(cHeader);
 
       const cBody = el('div', 'comment-body');
       cBody.innerHTML = highlight(cm.excerpt || cm.text, q);
       cItem.append(cBody);
-
       cmtWrap.append(cItem);
     }
     card.append(cmtWrap);
@@ -1419,7 +1932,532 @@ function renderCard(r, q) {
   return card;
 }
 
-// ---------- Event Listeners ----------
+// ---------- FORM BUILDER HELPER (Used for both Create and Edit) ----------
+
+function buildFieldsIntoContainer(container, schema, currentItem = null) {
+  container.innerHTML = '';
+  const schemaProps = (schema?.properties || []).slice();
+  const itemProps = currentItem?.properties || {};
+
+  // Safety net: ensure any properties present on currentItem are represented in schemaProps
+  const knownNames = new Set(schemaProps.map((p) => p.name));
+  for (const [propName, propVal] of Object.entries(itemProps)) {
+    if (!knownNames.has(propName)) {
+      let inferredType = 'rich_text';
+      if (typeof propVal === 'boolean') inferredType = 'checkbox';
+      else if (typeof propVal === 'number') inferredType = 'number';
+      else if (Array.isArray(propVal)) inferredType = 'multi_select';
+      schemaProps.push({
+        name: propName,
+        type: inferredType,
+      });
+      knownNames.add(propName);
+    }
+  }
+
+  for (const p of schemaProps) {
+    if (['formula', 'rollup', 'created_time', 'created_by', 'last_edited_time', 'last_edited_by', 'unique_id', 'button'].includes(p.type)) {
+      continue;
+    }
+
+    const group = el('div', 'form-group');
+    const isTitle = p.type === 'title';
+    const label = el('label');
+    label.innerHTML = `<span>${esc(p.name)} ${isTitle ? '<b style="color:var(--accent)">*</b>' : ''}</span><span class="prop-type-badge">${esc(p.type)}</span>`;
+    group.appendChild(label);
+
+    const currentVal = itemProps[p.name];
+
+    if (p.type === 'select' || p.type === 'status') {
+      const select = el('select', 'form-control');
+      select.dataset.propName = p.name;
+      select.dataset.propType = p.type;
+      select.appendChild(new Option('— Select option —', ''));
+
+      const selectedName = typeof currentVal === 'object' && currentVal ? currentVal.name : currentVal;
+      const opts = p.options || schema?.options_by_property?.[p.name] || [];
+      for (const opt of opts) {
+        const isSelected = selectedName === opt.name;
+        const o = new Option(opt.name, opt.name, isSelected, isSelected);
+        select.appendChild(o);
+      }
+      if (selectedName && !opts.some((o) => o.name === selectedName)) {
+        select.appendChild(new Option(selectedName, selectedName, true, true));
+      }
+      group.appendChild(select);
+    } else if (p.type === 'multi_select') {
+      const select = el('select', 'form-control');
+      select.dataset.propName = p.name;
+      select.dataset.propType = p.type;
+      select.multiple = true;
+      const opts = p.options || schema?.options_by_property?.[p.name] || [];
+      select.size = Math.min(5, Math.max(2, opts.length || 2));
+
+      const selectedNames = Array.isArray(currentVal)
+        ? currentVal.map((c) => (typeof c === 'object' && c ? c.name : c))
+        : (currentVal ? [typeof currentVal === 'object' ? currentVal.name : currentVal] : []);
+      for (const opt of opts) {
+        const isSelected = selectedNames.includes(opt.name);
+        const o = new Option(opt.name, opt.name, isSelected, isSelected);
+        select.appendChild(o);
+      }
+      for (const name of selectedNames) {
+        if (name && !opts.some((o) => o.name === name)) {
+          select.appendChild(new Option(name, name, true, true));
+        }
+      }
+      group.appendChild(select);
+      const hint = el('span', 'field-hint', 'Hold ⌘/Ctrl to select multiple');
+      group.appendChild(hint);
+    } else if (p.type === 'people') {
+      const select = el('select', 'form-control');
+      select.dataset.propName = p.name;
+      select.dataset.propType = p.type;
+      select.multiple = true;
+      const users = schema?.people_by_property?.[p.name] || p.users || [];
+      select.size = Math.min(5, Math.max(2, users.length || 2));
+
+      const selectedIds = Array.isArray(currentVal)
+        ? currentVal.map((u) => (typeof u === 'object' && u ? u.id || u.name : u))
+        : [];
+      for (const u of users) {
+        const isSelected = selectedIds.includes(u.id) || selectedIds.includes(u.name);
+        const o = new Option(u.label || u.name, u.id, isSelected, isSelected);
+        select.appendChild(o);
+      }
+      if (Array.isArray(currentVal)) {
+        for (const u of currentVal) {
+          const uid = typeof u === 'object' && u ? u.id : u;
+          const ulabel = typeof u === 'object' && u ? (u.label || u.name || u.email || uid) : uid;
+          if (uid && !users.some((x) => x.id === uid)) {
+            select.appendChild(new Option(ulabel, uid, true, true));
+          }
+        }
+      }
+      group.appendChild(select);
+      const hint = el('span', 'field-hint', 'Hold ⌘/Ctrl to select multiple assignees');
+      group.appendChild(hint);
+    } else if (p.type === 'relation') {
+      const select = el('select', 'form-control');
+      select.dataset.propName = p.name;
+      select.dataset.propType = p.type;
+      select.multiple = true;
+      const targets = schema?.relations_by_property?.[p.name] || p.targets || [];
+      select.size = Math.min(5, Math.max(2, targets.length || 2));
+
+      const selectedIds = Array.isArray(currentVal)
+        ? currentVal.map((t) => (typeof t === 'object' && t ? t.id || t.title : t))
+        : [];
+      for (const t of targets) {
+        const isSelected = selectedIds.includes(t.id) || selectedIds.includes(t.title);
+        const o = new Option(t.label || t.title, t.id, isSelected, isSelected);
+        select.appendChild(o);
+      }
+      if (Array.isArray(currentVal)) {
+        for (const t of currentVal) {
+          const tid = typeof t === 'object' && t ? t.id : t;
+          const tlabel = typeof t === 'object' && t ? (t.label || t.title || tid) : tid;
+          if (tid && !targets.some((x) => x.id === tid)) {
+            select.appendChild(new Option(tlabel, tid, true, true));
+          }
+        }
+      }
+      group.appendChild(select);
+      const hint = el('span', 'field-hint', 'Hold ⌘/Ctrl to select multiple relations');
+      group.appendChild(hint);
+    } else if (p.type === 'checkbox') {
+      const wrap = el('div', 'form-checkbox-wrap');
+      const chk = el('input');
+      chk.type = 'checkbox';
+      chk.dataset.propName = p.name;
+      chk.dataset.propType = p.type;
+      chk.checked = Boolean(currentVal);
+      const span = el('span', '', 'Checked');
+      wrap.append(chk, span);
+      group.appendChild(wrap);
+    } else if (p.type === 'number') {
+      const input = el('input', 'form-control');
+      input.type = 'number';
+      input.dataset.propName = p.name;
+      input.dataset.propType = p.type;
+      input.value = currentVal != null ? currentVal : '';
+      input.placeholder = p.format || '0';
+      group.appendChild(input);
+    } else if (p.type === 'date') {
+      const input = el('input', 'form-control');
+      input.type = 'date';
+      input.dataset.propName = p.name;
+      input.dataset.propType = p.type;
+      if (currentVal) {
+        input.value = typeof currentVal === 'object' && currentVal ? (currentVal.start || '') : String(currentVal).slice(0, 10);
+      }
+      group.appendChild(input);
+    } else if (p.type === 'rich_text') {
+      const textarea = el('textarea', 'form-control');
+      textarea.rows = 2;
+      textarea.dataset.propName = p.name;
+      textarea.dataset.propType = p.type;
+      let displayStr = '';
+      if (currentVal != null) {
+        displayStr = typeof currentVal === 'object' ? JSON.stringify(currentVal) : String(currentVal);
+      }
+      textarea.value = displayStr;
+      textarea.placeholder = `Enter ${p.name}...`;
+      group.appendChild(textarea);
+    } else {
+      // title, url, email, phone_number
+      const input = el('input', 'form-control');
+      input.type = p.type === 'email' ? 'email' : (p.type === 'url' ? 'url' : 'text');
+      input.dataset.propName = p.name;
+      input.dataset.propType = p.type;
+      if (isTitle) {
+        input.required = true;
+        input.placeholder = 'Enter title (required)...';
+      } else {
+        input.placeholder = `Enter ${p.name}...`;
+      }
+      let displayStr = '';
+      if (currentVal != null) {
+        displayStr = typeof currentVal === 'object' ? JSON.stringify(currentVal) : String(currentVal);
+      } else if (isTitle && currentItem) {
+        displayStr = currentItem.title || '';
+      }
+      input.value = displayStr;
+      group.appendChild(input);
+    }
+
+    container.appendChild(group);
+  }
+}
+
+function extractPayloadFromContainer(container, isEdit = false) {
+  const properties = {};
+  const inputs = container.querySelectorAll('[data-prop-name]');
+
+  for (const input of inputs) {
+    const propName = input.dataset.propName;
+    const propType = input.dataset.propType;
+
+    if (propType === 'checkbox') {
+      properties[propName] = Boolean(input.checked);
+    } else if (propType === 'multi_select' || propType === 'people' || propType === 'relation') {
+      if (input.multiple) {
+        const values = [...input.selectedOptions].map((o) => o.value).filter(Boolean);
+        if (values.length > 0 || isEdit) {
+          properties[propName] = values;
+        }
+      } else {
+        const val = input.value.trim();
+        if (val) properties[propName] = [val];
+      }
+    } else if (propType === 'number') {
+      const val = input.value.trim();
+      if (val !== '') properties[propName] = Number(val);
+      else if (isEdit) properties[propName] = null;
+    } else {
+      const val = input.value.trim();
+      if (val !== '') {
+        properties[propName] = val;
+      } else if (isEdit && propType !== 'title') {
+        properties[propName] = null;
+      }
+    }
+  }
+
+  return properties;
+}
+
+// ---------- VIEW 2: CREATE ITEM IMPLEMENTATION ----------
+
+function renderCreateForm() {
+  if (!ACTIVE_SCHEMA) return;
+  const container = $('#create-form-fields');
+  buildFieldsIntoContainer(container, ACTIVE_SCHEMA, null);
+  updateCreateRawJson();
+
+  // Keep live sync active
+  container.oninput = updateCreateRawJson;
+  container.onchange = updateCreateRawJson;
+  $('#create-field-content').oninput = updateCreateRawJson;
+  $('#create-field-icon').oninput = updateCreateRawJson;
+  $('#create-field-cover').oninput = updateCreateRawJson;
+}
+
+function updateCreateRawJson() {
+  const properties = extractPayloadFromContainer($('#create-form-fields'), false);
+  const content = $('#create-field-content').value.trim();
+  const icon = $('#create-field-icon').value.trim();
+  const cover = $('#create-field-cover').value.trim();
+
+  const payload = {
+    databaseId: ACTIVE_DB_ID,
+    properties,
+  };
+  if (content) payload.content = content;
+  if (icon) payload.icon = icon;
+  if (cover) payload.cover = cover;
+
+  $('#create-raw-json').value = JSON.stringify(payload, null, 2);
+}
+
+// Subtab toggles for Create View
+$('#create-subtab-form').onclick = () => {
+  $('#create-subtab-form').classList.add('active');
+  $('#create-subtab-json').classList.remove('active');
+  $('#create-container-form').hidden = false;
+  $('#create-container-json').hidden = true;
+};
+$('#create-subtab-json').onclick = () => {
+  $('#create-subtab-json').classList.add('active');
+  $('#create-subtab-form').classList.remove('active');
+  $('#create-container-form').hidden = true;
+  $('#create-container-json').hidden = false;
+  updateCreateRawJson();
+};
+
+$('#create-btn-reset').onclick = () => {
+  $('#create-form').reset();
+  renderCreateForm();
+  $('#create-api-feedback').hidden = true;
+};
+
+async function submitCreateItem(rawPayload = null) {
+  const btn = $('#create-btn-submit');
+  const spinner = $('#create-spinner');
+  const label = $('#create-submit-label');
+  const feedback = $('#create-api-feedback');
+
+  feedback.hidden = true;
+  spinner.hidden = false;
+  if (btn) btn.disabled = true;
+  label.textContent = 'Creating in Notion…';
+
+  try {
+    let payload = rawPayload;
+    if (!payload) {
+      const properties = extractPayloadFromContainer($('#create-form-fields'), false);
+      const content = $('#create-field-content').value.trim();
+      const icon = $('#create-field-icon').value.trim();
+      const cover = $('#create-field-cover').value.trim();
+
+      payload = {
+        databaseId: ACTIVE_DB_ID,
+        properties,
+      };
+      if (content) payload.content = content;
+      if (icon) payload.icon = icon;
+      if (cover) payload.cover = cover;
+    }
+
+    const res = await fetch('/api/pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    feedback.className = 'api-feedback-box success';
+    feedback.innerHTML = `✅ Successfully Created in Notion (Status: 201)!\n\n` +
+      `Page ID: ${esc(data.id)}\nTitle: ${esc(data.title)}\n` +
+      (data.url ? `Notion URL: <a href="${esc(data.url)}" target="_blank" style="color:var(--accent); font-weight:600;">Open Created Page in Notion ↗</a>\n\n` : '\n') +
+      JSON.stringify(data, null, 2);
+    feedback.hidden = false;
+
+    // Refresh background search
+    runSearch();
+  } catch (err) {
+    feedback.className = 'api-feedback-box error';
+    feedback.textContent = `❌ Creation Error: ${err.message}`;
+    feedback.hidden = false;
+  } finally {
+    spinner.hidden = true;
+    label.textContent = '🚀 Create in Notion';
+    if (btn) btn.disabled = false;
+  }
+}
+
+$('#create-btn-submit').onclick = () => submitCreateItem(null);
+$('#create-btn-submit-json').onclick = () => {
+  try {
+    const payload = JSON.parse($('#create-raw-json').value);
+    submitCreateItem(payload);
+  } catch (err) {
+    const feedback = $('#create-api-feedback');
+    feedback.className = 'api-feedback-box error';
+    feedback.textContent = `❌ Invalid JSON in Raw JSON box: ${err.message}`;
+    feedback.hidden = false;
+  }
+};
+
+// ---------- VIEW 3: API CAPABILITIES VIEW ----------
+
+function renderDocsView() {
+  const pre = $('#docs-content');
+  if (ACTIVE_FILTER_DOC) {
+    pre.textContent = JSON.stringify(ACTIVE_FILTER_DOC, null, 2);
+  } else {
+    pre.textContent = 'No capability document available for active database.';
+  }
+}
+
+// ---------- EDIT ITEM MODAL IMPLEMENTATION ----------
+
+function openEditModal(item) {
+  try {
+    if (!item) return;
+    EDITING_ITEM = item;
+
+    $('#edit-modal-title-text').textContent = `Edit Item: "${item.title || 'Untitled'}"`;
+    const notionLink = $('#edit-modal-notion-link');
+    if (notionLink) {
+      notionLink.href = item.url || '#';
+      notionLink.hidden = !item.url;
+    }
+    $('#edit-field-append').value = '';
+    $('#edit-field-icon').value = typeof item.icon === 'string' ? item.icon : (item.icon?.emoji || '');
+    $('#edit-field-cover').value = typeof item.cover === 'string' ? item.cover : (item.cover?.url || '');
+    $('#edit-api-feedback').hidden = true;
+
+    const container = $('#edit-form-fields');
+    buildFieldsIntoContainer(container, ACTIVE_SCHEMA, item);
+
+    const modal = $('#edit-modal');
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    // Focus first editable input
+    setTimeout(() => {
+      const firstInput = container.querySelector('input, select, textarea');
+      if (firstInput) firstInput.focus();
+    }, 50);
+  } catch (err) {
+    console.error('Error opening edit modal:', err);
+    alert('Could not open item editor: ' + err.message);
+  }
+}
+
+function closeEditModal() {
+  const modal = $('#edit-modal');
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  EDITING_ITEM = null;
+}
+
+$('#edit-btn-close').onclick = closeEditModal;
+$('#edit-btn-cancel').onclick = closeEditModal;
+$('#edit-modal').onclick = (e) => {
+  if (e.target.id === 'edit-modal') closeEditModal();
+};
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#edit-modal').classList.contains('open')) {
+    closeEditModal();
+  }
+});
+
+$('#edit-btn-submit').onclick = async () => {
+  if (!EDITING_ITEM) return;
+
+  const btn = $('#edit-btn-submit');
+  const spinner = $('#edit-spinner');
+  const label = $('#edit-submit-label');
+  const feedback = $('#edit-api-feedback');
+
+  feedback.hidden = true;
+  spinner.hidden = false;
+  if (btn) btn.disabled = true;
+  label.textContent = 'Saving…';
+
+  try {
+    const properties = extractPayloadFromContainer($('#edit-form-fields'), true);
+    const appendContent = $('#edit-field-append').value.trim();
+    const icon = $('#edit-field-icon').value.trim();
+    const cover = $('#edit-field-cover').value.trim();
+
+    const payload = { properties };
+    if (appendContent) payload.appendContent = appendContent;
+    if (icon) payload.icon = icon;
+    if (cover) payload.cover = cover;
+
+    const res = await fetch(`/api/pages/${EDITING_ITEM.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    feedback.className = 'api-feedback-box success';
+    feedback.innerHTML = `✅ Saved successfully!\n\n` + JSON.stringify(data, null, 2);
+    feedback.hidden = false;
+
+    runSearch();
+
+    setTimeout(() => {
+      closeEditModal();
+    }, 1100);
+  } catch (err) {
+    feedback.className = 'api-feedback-box error';
+    feedback.textContent = `❌ Update Error: ${err.message}`;
+    feedback.hidden = false;
+  } finally {
+    spinner.hidden = true;
+    label.textContent = '💾 Save Changes';
+    if (btn) btn.disabled = false;
+  }
+};
+
+$('#edit-btn-archive').onclick = async () => {
+  if (!EDITING_ITEM) return;
+  if (!confirm(`Are you sure you want to archive "${EDITING_ITEM.title || 'this item'}" from Notion?`)) {
+    return;
+  }
+
+  const feedback = $('#edit-api-feedback');
+  feedback.hidden = true;
+
+  try {
+    const res = await fetch(`/api/pages/${EDITING_ITEM.id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    feedback.className = 'api-feedback-box success';
+    feedback.textContent = `🗑️ Item archived successfully!\n` + JSON.stringify(data, null, 2);
+    feedback.hidden = false;
+
+    runSearch();
+
+    setTimeout(() => {
+      closeEditModal();
+    }, 1000);
+  } catch (err) {
+    feedback.className = 'api-feedback-box error';
+    feedback.textContent = `❌ Archive Error: ${err.message}`;
+    feedback.hidden = false;
+  }
+};
+
+// Emoji preset button delegator
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-chip-emoji');
+  if (!btn) return;
+  const emoji = btn.dataset.emoji;
+  const parent = btn.closest('.emoji-presets');
+  if (parent && emoji) {
+    const targetId = parent.dataset.target;
+    const targetInput = $('#' + targetId);
+    if (targetInput) {
+      targetInput.value = emoji;
+      targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+});
+
+// ---------- Main Form & Event Listeners ----------
 
 $('#form').onsubmit = (e) => {
   e.preventDefault();

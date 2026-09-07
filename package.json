@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node test/generic-schema.test.mjs && node test/comment-search.test.mjs && node test/resources-and-content.test.mjs"
+    "test": "node test/create-edit.test.mjs && node test/generic-schema.test.mjs && node test/comment-search.test.mjs && node test/resources-and-content.test.mjs"
   },
   "dependencies": {
     "express": "^4.21.2"

@@ -93,10 +93,48 @@ export async function filterInstructions({ databaseId, refresh = false } = {}) {
     });
   }
 
+  // Build creation & edit capability documentation
+  const editableProperties = {};
+  const sampleCreateProps = {};
+  const sampleEditProps = {};
+
+  for (const p of schema.properties) {
+    if (['formula', 'rollup', 'created_time', 'created_by', 'last_edited_time', 'last_edited_by', 'unique_id', 'button'].includes(p.type)) {
+      continue;
+    }
+    editableProperties[p.name] = {
+      type: p.type,
+      options: p.options ? p.options.map((o) => o.name) : undefined,
+      users: p.users ? p.users.map((u) => u.name || u.label).filter(Boolean) : undefined,
+      targets: p.targets ? p.targets.map((t) => t.title || t.label).filter(Boolean) : undefined,
+    };
+
+    // Construct realistic examples
+    if (p.type === 'title') {
+      sampleCreateProps[p.name] = 'New sample item';
+    } else if (p.type === 'status' && p.options?.[0]) {
+      sampleCreateProps[p.name] = p.options[0].name;
+      if (p.options?.[1]) sampleEditProps[p.name] = p.options[1].name;
+    } else if (p.type === 'select' && p.options?.[0]) {
+      sampleCreateProps[p.name] = p.options[0].name;
+    } else if (p.type === 'multi_select' && p.options?.[0]) {
+      sampleCreateProps[p.name] = [p.options[0].name];
+    } else if (p.type === 'number') {
+      sampleCreateProps[p.name] = 10;
+      sampleEditProps[p.name] = 15;
+    } else if (p.type === 'checkbox') {
+      sampleCreateProps[p.name] = false;
+      sampleEditProps[p.name] = true;
+    } else if (p.type === 'date') {
+      sampleCreateProps[p.name] = new Date().toISOString().slice(0, 10);
+    }
+  }
+
   return {
     database: {
       id: db.id,
       name: db.title,
+      title_property: schema.title_property,
     },
     how_to_search: {
       method: 'POST',
@@ -109,6 +147,44 @@ export async function filterInstructions({ databaseId, refresh = false } = {}) {
         offset: 0,
       },
     },
+    how_to_create: {
+      method: 'POST',
+      endpoint: '/api/pages',
+      database_endpoint: `/api/databases/${db.id}/pages`,
+      body_format: {
+        databaseId: db.id,
+        properties: 'Map of property names to values matching the schema',
+        content: 'Optional Markdown string parsed into Notion blocks (headings, lists, code, etc.)',
+        icon: 'Optional emoji string (e.g. "🚀") or image URL',
+        cover: 'Optional cover image URL',
+      },
+      example: {
+        databaseId: db.id,
+        properties: sampleCreateProps,
+        content: '## Details\n- Added via API\n- Supports **markdown** formatting',
+        icon: '📝',
+      },
+    },
+    how_to_edit: {
+      method: 'PATCH',
+      endpoint: '/api/pages/:id',
+      body_format: {
+        properties: 'Map of field names to updated values',
+        appendContent: 'Optional Markdown string to append to page body',
+        archived: 'Boolean: set true to archive/trash, false to restore',
+        icon: 'Optional updated emoji or image URL',
+        cover: 'Optional updated cover image URL',
+      },
+      example: {
+        properties: sampleEditProps,
+        appendContent: '- Updated status via API',
+      },
+    },
+    how_to_archive: {
+      method: 'DELETE',
+      endpoint: '/api/pages/:id',
+    },
+    editable_properties: editableProperties,
     filters,
     examples,
   };

@@ -44,6 +44,14 @@ export const getBlockChildren = (blockId, cursor) =>
 export const getComments = (blockId, cursor) =>
   request('GET', `/comments?block_id=${blockId}&page_size=100${cursor ? `&start_cursor=${cursor}` : ''}`);
 
+export const createPage = (body) => request('POST', '/pages', body);
+export const updatePage = (id, body) => request('PATCH', `/pages/${id}`, body);
+export const appendBlockChildren = (blockId, children) =>
+  request('PATCH', `/blocks/${blockId}/children`, { children });
+export const deleteBlock = (blockId) => request('DELETE', `/blocks/${blockId}`);
+export const createDatabase = (body) => request('POST', '/databases', body);
+export const updateDatabase = (id, body) => request('PATCH', `/databases/${id}`, body);
+
 /** Query every database in workspace. */
 export async function searchAllDatabases() {
   const out = [];

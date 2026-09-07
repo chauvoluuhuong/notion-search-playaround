@@ -7,6 +7,13 @@ import { getResourceContent } from './src/page_content.js';
 import { getDatabaseSchema } from './src/directory.js';
 import { filterInstructions } from './src/filters.js';
 import { search } from './src/search.js';
+import {
+  createPageItem,
+  updatePageItem,
+  archivePageItem,
+  createDatabaseItem,
+  updateDatabaseItem,
+} from './src/mutation.js';
 import { NotionError } from './src/notion.js';
 
 const app = express();
@@ -73,6 +80,7 @@ app.get('/api/options', wrap(async (req, res) => {
 
   res.json({
     database: schema.database,
+    title_property: schema.title_property,
     properties: schema.properties,
     options_by_property: schema.options_by_property,
     people_by_property: schema.people_by_property,
@@ -91,6 +99,47 @@ app.get('/api/pages/:id', handleContent);
 
 app.post('/api/search', wrap(async (req, res) => res.json(await search(req.body || {}))));
 
+/** Create a new page or database item */
+app.post('/api/pages', wrap(async (req, res) => {
+  const result = await createPageItem(req.body || {});
+  res.status(201).json(result);
+}));
+
+/** Create a new item/row in a specific database */
+const handleDbCreatePage = wrap(async (req, res) => {
+  const databaseId = req.params.id;
+  const result = await createPageItem({ ...(req.body || {}), databaseId });
+  res.status(201).json(result);
+});
+app.post('/api/databases/:id/pages', handleDbCreatePage);
+app.post('/api/databases/:id/items', handleDbCreatePage);
+
+/** Edit / update a page or database item */
+const handleUpdatePage = wrap(async (req, res) => {
+  const result = await updatePageItem(req.params.id, req.body || {});
+  res.json(result);
+});
+app.patch('/api/pages/:id', handleUpdatePage);
+app.put('/api/pages/:id', handleUpdatePage);
+
+/** Archive (soft delete) a page or database item */
+app.delete('/api/pages/:id', wrap(async (req, res) => {
+  const result = await archivePageItem(req.params.id);
+  res.json(result);
+}));
+
+/** Create a new database under a parent page */
+app.post('/api/databases', wrap(async (req, res) => {
+  const result = await createDatabaseItem(req.body || {});
+  res.status(201).json(result);
+}));
+
+/** Update / edit database metadata or properties */
+app.patch('/api/databases/:id', wrap(async (req, res) => {
+  const result = await updateDatabaseItem(req.params.id, req.body || {});
+  res.json(result);
+}));
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.listen(PORT, () => {
@@ -101,5 +150,8 @@ app.listen(PORT, () => {
   console.log(`  databases API    http://localhost:${PORT}/api/databases`);
   console.log(`  search API       http://localhost:${PORT}/api/search`);
   console.log(`  filter API       http://localhost:${PORT}/api/filters`);
+  console.log(`  create page API  http://localhost:${PORT}/api/pages (POST)`);
+  console.log(`  edit page API    http://localhost:${PORT}/api/pages/:id (PATCH)`);
+  console.log(`  archive page API http://localhost:${PORT}/api/pages/:id (DELETE)`);
   console.log(`  instructions API http://localhost:${PORT}/api/filter-instructions/:id`);
 });

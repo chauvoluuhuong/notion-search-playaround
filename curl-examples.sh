@@ -105,3 +105,72 @@ curl -sS -X POST "$BASE/api/search" \
     "pageSize": 10,
     "offset": 0
   }'
+
+#==========================================================================
+# 04 · Create Pages & Database Items (POST /api/pages)
+#==========================================================================
+
+# Create a new item in a database using intuitive schema-matched properties
+curl -sS -X POST "$BASE/api/pages" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "databaseId": "9d483ce4-2747-4ea3-a741-bc9a2bc98c4e",
+    "properties": {
+      "Story": "Implement Single Sign-On (SSO)",
+      "Status": "In progress",
+      "Priority": "P1",
+      "Estimate (pts)": 5,
+      "Due": "2026-09-20"
+    },
+    "content": "## Implementation Details\n- Configure SAML 2.0 provider\n- Test with Okta and Google Workspace\n- [Documentation](https://notion.so)",
+    "icon": "🔐"
+  }'
+
+# Create a new item directly using the database-specific endpoint
+curl -sS -X POST "$BASE/api/databases/9d483ce4-2747-4ea3-a741-bc9a2bc98c4e/pages" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "properties": {
+      "Story": "Audit user permissions",
+      "Status": "Ready for review",
+      "Priority": "P2"
+    },
+    "icon": "📋"
+  }'
+
+# Create a subpage under an existing page
+curl -sS -X POST "$BASE/api/pages" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "pageId": "276800dd-8789-81bc-a8b5-000b0f9f30b9",
+    "title": "API Documentation Notes",
+    "content": "# API Notes\nThis is a subpage created via the Notion Create API.",
+    "icon": "📄"
+  }'
+
+#==========================================================================
+# 05 · Edit / Update Pages & Items (PATCH /api/pages/:id)
+#==========================================================================
+
+# Update properties of an existing item (e.g. status, priority, estimate)
+curl -sS -X PATCH "$BASE/api/pages/<PAGE_ID>" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "properties": {
+      "Status": "Done",
+      "Priority": "P0",
+      "Estimate (pts)": 8
+    },
+    "appendContent": "- Completed code review and QA testing",
+    "icon": "✅"
+  }'
+
+# Archive (soft-delete) a page or database item
+curl -sS -X DELETE "$BASE/api/pages/<PAGE_ID>"
+
+# Restore an archived page
+curl -sS -X PATCH "$BASE/api/pages/<PAGE_ID>" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "archived": false
+  }'
