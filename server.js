@@ -5,7 +5,7 @@ import { listDatabases, resolveDatabaseId } from './src/databases.js';
 import { listResources } from './src/resources.js';
 import { getResourceContent } from './src/page_content.js';
 import { getDatabaseSchema } from './src/directory.js';
-import { filterInstructions } from './src/filters.js';
+import { getInstructions } from './src/instructions.js';
 import { search } from './src/search.js';
 import {
   createPageItem,
@@ -43,35 +43,30 @@ app.get('/api/databases', wrap(async (req, res) => {
   res.json({ databases, count: databases.length });
 }));
 
-/** Full schema & filter instructions for a specific database. */
+/** Full schema & self-describing instructions for a specific database. */
 app.get('/api/databases/:id', wrap(async (req, res) => {
   const databaseId = req.params.id;
-  const instructions = await filterInstructions({
+  const instructions = await getInstructions({
     databaseId,
     refresh: req.query.refresh === '1',
   });
   res.json(instructions);
 }));
 
-/** Filter capability document: what can be filtered and with which values. */
-app.get('/api/filters', wrap(async (req, res) => {
-  const databaseId = req.query.database_id || req.query.database;
-  res.json(await filterInstructions({ databaseId, refresh: req.query.refresh === '1' }));
-}));
-app.get('/api/filters/:id', wrap(async (req, res) => {
-  const databaseId = req.params.id;
-  res.json(await filterInstructions({ databaseId, refresh: req.query.refresh === '1' }));
-}));
+const handleInstructions = wrap(async (req, res) => {
+  const databaseId = req.params.id || req.query.database_id || req.query.database;
+  res.json(await getInstructions({ databaseId, refresh: req.query.refresh === '1' }));
+});
 
-/** Filter instructions endpoint: returns dynamic filter capability document by database ID or default. */
-app.get('/api/filter-instructions', wrap(async (req, res) => {
-  const databaseId = req.query.database_id || req.query.database;
-  res.json(await filterInstructions({ databaseId, refresh: req.query.refresh === '1' }));
-}));
-app.get('/api/filter-instructions/:id', wrap(async (req, res) => {
-  const databaseId = req.params.id;
-  res.json(await filterInstructions({ databaseId, refresh: req.query.refresh === '1' }));
-}));
+/** Self-describing schema & instructions for AI agents and developers. */
+app.get('/api/instructions', handleInstructions);
+app.get('/api/instructions/:id', handleInstructions);
+
+/** Aliases for filter instructions capability document. */
+app.get('/api/filters', handleInstructions);
+app.get('/api/filters/:id', handleInstructions);
+app.get('/api/filter-instructions', handleInstructions);
+app.get('/api/filter-instructions/:id', handleInstructions);
 
 /** Value lists & options for populating dynamic dropdowns. */
 app.get('/api/options', wrap(async (req, res) => {
@@ -175,5 +170,5 @@ app.listen(PORT, () => {
   console.log(`  edit page API    http://localhost:${PORT}/api/pages/:id (PATCH)`);
   console.log(`  archive page API http://localhost:${PORT}/api/pages/:id (DELETE)`);
   console.log(`  comments API     http://localhost:${PORT}/api/pages/:id/comments (GET, POST)`);
-  console.log(`  instructions API http://localhost:${PORT}/api/filter-instructions/:id`);
+  console.log(`  instructions API http://localhost:${PORT}/api/instructions/:id`);
 });
