@@ -172,10 +172,12 @@ export async function getInstructions({ databaseId, refresh = false } = {}) {
       method: 'POST',
       endpoint: '/api/pages',
       database_endpoint: `/api/databases/${db.id}/pages`,
-      transformation: 'Take `object_schema.properties`, omitting any marked `readOnly: true`. The property matching `database.title_property` is required; all other editable fields are optional. Supply values conforming to each field\'s type/enum.',
       payload_structure: {
         databaseId: 'string (database.id)',
-        properties: 'object mapping field names to values conforming to object_schema',
+        properties: {
+          $ref: '#/object_schema',
+          description: `Object conforming to object_schema. Required: database.title_property ("${titlePropName}"). Omit properties marked readOnly.`,
+        },
         content: 'optional Markdown string parsed automatically into native Notion blocks (headings, checklists, code blocks)',
         comment: 'optional initial comment string posted to the newly created page',
         icon: 'optional emoji string (e.g. "🚀") or image URL',
@@ -193,9 +195,11 @@ export async function getInstructions({ databaseId, refresh = false } = {}) {
     edit: {
       method: 'PATCH',
       endpoint: '/api/pages/:id',
-      transformation: 'Pick any subset of `object_schema.properties` (excluding `readOnly: true`). Include ONLY the specific fields you want to update (sparse/partial update). Omitted fields remain untouched in Notion.',
       payload_structure: {
-        properties: 'sparse object containing only fields being updated',
+        properties: {
+          $ref: '#/object_schema',
+          description: 'Partial<object_schema>. Sparse object containing only fields being updated. All fields optional. Pass null to clear/unset a property.',
+        },
         appendContent: 'optional Markdown string appended as new blocks to body',
         comment: 'optional comment string posted during update',
         archived: 'optional boolean (true to move to trash, false to restore)',
@@ -212,11 +216,12 @@ export async function getInstructions({ databaseId, refresh = false } = {}) {
     filter: {
       method: 'POST',
       endpoint: '/api/search',
-      transformation: 'Map field names from `object_schema.properties` to filter criteria. For select, status, multi_select, people, and relation: pass a single string or an array of strings (OR matching). For dates: pass "YYYY-MM-DD" or relative keywords ("past_week", "this_week", "next_week", "past_month"). For numbers: pass number (e.g. 5) or comparison string (e.g. ">=5", "<=10"). For checkboxes: pass boolean true/false.',
       payload_structure: {
         databaseId: 'string (database.id)',
         searchText: 'optional free-text query string (searches title, body notes, and comments)',
-        filter: 'object mapping field names to filter criteria',
+        filter: {
+          description: 'Map of property names from object_schema to filter criteria. Supports: single value, array of values (OR match), "none" (empty check), number comparisons (>=5, <=10), or relative date keywords (this_week, past_week, past_month).',
+        },
         pageSize: 'number (default 25, max 100)',
         offset: 'number (default 0)',
       },

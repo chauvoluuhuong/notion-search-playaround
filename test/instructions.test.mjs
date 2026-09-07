@@ -182,15 +182,21 @@ await t('getInstructions returns database info, clean object_schema, and action 
     assert.ok(doc.actions.create);
     assert.equal(doc.actions.create.method, 'POST');
     assert.equal(doc.actions.create.endpoint, '/api/pages');
-    assert.ok(doc.actions.create.transformation.includes('object_schema'));
+    assert.equal(doc.actions.create.transformation, undefined);
+    assert.equal(doc.actions.create.payload_structure.properties.$ref, '#/object_schema');
+    assert.ok(doc.actions.create.payload_structure.properties.description.includes('Required: database.title_property'));
 
     assert.ok(doc.actions.edit);
     assert.equal(doc.actions.edit.method, 'PATCH');
-    assert.ok(doc.actions.edit.transformation.includes('sparse'));
+    assert.equal(doc.actions.edit.transformation, undefined);
+    assert.equal(doc.actions.edit.payload_structure.properties.$ref, '#/object_schema');
+    assert.ok(doc.actions.edit.payload_structure.properties.description.includes('Partial<object_schema>'));
 
     assert.ok(doc.actions.filter);
     assert.equal(doc.actions.filter.method, 'POST');
     assert.equal(doc.actions.filter.endpoint, '/api/search');
+    assert.equal(doc.actions.filter.transformation, undefined);
+    assert.ok(doc.actions.filter.payload_structure.filter.description.includes('object_schema'));
 
     assert.ok(doc.actions.comment);
     assert.ok(doc.actions.comment.get_comments);
